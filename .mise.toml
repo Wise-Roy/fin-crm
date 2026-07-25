@@ -1,0 +1,7 @@
+[tools]
+node = "22"
+yarn = "4.14.1"
+
+[tasks]
+seed-db = "yarn workspace db seed"
+clean = "rimraf node_modules apps/*/node_modules packages/*/node_modules .turbo"
