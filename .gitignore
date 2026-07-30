@@ -85,3 +85,6 @@ temp/
 packages/db/.agents/
 packages/db/.claude/
 packages/db/.windsurf/
+
+supabase/.temp
+.supabase/
