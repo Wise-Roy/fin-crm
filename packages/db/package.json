@@ -1,5 +1,7 @@
 {
   "name": "@repo/db",
+  "version": "1.0.0",
+  "private": true,
   "packageManager": "yarn@4.14.1",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -8,7 +10,8 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "seed": "prisma db seed"
+    "seed": "prisma db seed",
+    "build": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
