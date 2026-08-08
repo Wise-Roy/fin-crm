@@ -22,13 +22,15 @@ import { can } from "@/lib/utils";
 import { RoleBadge } from "@/components/ui-atoms";
 import { NotifPanel } from "@/components/notification-panel";
 import { QuickAddModal } from "@/components/quick-add-modal";
+import { DateRangeSelector, getTodayRange } from "@/components/date-range-selector";
+import type { DateRange } from "@/components/date-range-selector";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { TasksView } from "@/components/views/tasks-view";
 import { ClientsView } from "@/components/views/clients-view";
 import { TeamView } from "@/components/views/team-view";
 import { ReimbursementsView } from "@/components/views/reimbursements-view";
 import { AnalyticsView } from "@/components/views/analytics-view";
-import { INIT_REIMB, INIT_NOTIFS } from "@/lib/data";
+import { INIT_NOTIFS } from "@/lib/data";
 import type {
   Task,
   Client,
@@ -36,6 +38,7 @@ import type {
   JoinRequest,
   Category,
   Reimbursement,
+  TaskPayment,
   Notification as NotifType,
   TaskStatus,
   Role,
@@ -72,9 +75,11 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Local-only (no backend yet)
-  const [reimbs] = useState<Reimbursement[]>(INIT_REIMB);
+  const [reimbs, setReimbs] = useState<Reimbursement[]>([]);
+  const [payments, setPayments] = useState<TaskPayment[]>([]);
   const [notifs, setNotifs] = useState<NotifType[]>(INIT_NOTIFS);
+
+  const [dateRange, setDateRange] = useState<DateRange>(getTodayRange);
 
   const [showAddTask, setShowAddTask] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -101,19 +106,34 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
-  // Fetch all data on mount
+  // Helper to get ISO date strings for API params
+  const getDateParams = useCallback((): Record<string, string> => {
+    const y = (d: Date) => d.getFullYear();
+    const m = (d: Date) => String(d.getMonth() + 1).padStart(2, "0");
+    const day = (d: Date) => String(d.getDate()).padStart(2, "0");
+    const fmt = (d: Date) => `${y(d)}-${m(d)}-${day(d)}`;
+    return {
+      startDate: fmt(dateRange.startDate),
+      endDate: fmt(dateRange.endDate),
+    };
+  }, [dateRange]);
+
+  // Fetch all data on mount and when date range changes
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const isAdmin = can(userRole, "see_all");
+      const dp = getDateParams();
 
       const fetches: Promise<unknown>[] = [
         isAdmin
-          ? api.tasks.list({ limit: "100" })
-          : api.tasks.my({ limit: "100" }),
+          ? api.tasks.list({ limit: "100", ...dp })
+          : api.tasks.my({ limit: "100", ...dp }),
         api.clients.list({ limit: "100" }),
         api.team.list({ limit: "100" }),
         api.categories.list(),
+        api.reimbursements.list({ limit: "100" }),
+        api.payments.list({ limit: "100" }),
       ];
 
       // Only OWNER can view join requests
@@ -127,16 +147,18 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       setClients((results[1] as { data: Client[] }).data);
       setTeamMembers((results[2] as { data: TeamMember[] }).data);
       setCategories((results[3] as { data: Category[] }).data);
+      setReimbs((results[4] as { data: Reimbursement[] }).data);
+      setPayments((results[5] as { data: TaskPayment[] }).data);
 
-      if (results[4]) {
-        setJoinRequests((results[4] as { data: JoinRequest[] }).data);
+      if (results[6]) {
+        setJoinRequests((results[6] as { data: JoinRequest[] }).data);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
     }
-  }, [userRole]);
+  }, [userRole, getDateParams]);
 
   useEffect(() => {
     fetchData();
@@ -206,6 +228,89 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       setClients((prev) => [client, ...prev]);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to create client";
+      alert(msg);
+    }
+  }, []);
+
+  const handleReimbAction = useCallback(async (id: string, action: "APPROVED" | "REJECTED") => {
+    try {
+      const fn = action === "APPROVED" ? api.reimbursements.approve : api.reimbursements.reject;
+      const { reimbursement } = await fn(id);
+      setReimbs((prev) => prev.map((r) => (r.id === id ? reimbursement : r)));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to update reimbursement";
+      alert(msg);
+    }
+  }, []);
+
+  const handleCreateReimb = useCallback(async (data: { task_id: string; amount: number; description?: string }) => {
+    try {
+      const { reimbursement } = await api.reimbursements.create(data);
+      setReimbs((prev) => [reimbursement, ...prev]);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to submit reimbursement";
+      alert(msg);
+    }
+  }, []);
+
+  const handleCreatePayment = useCallback(async (data: { task_id: string; payment_type: string; amount: number }) => {
+    try {
+      const { payment } = await api.payments.create(data);
+      setPayments((prev) => [payment, ...prev]);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to create payment";
+      alert(msg);
+    }
+  }, []);
+
+  const handleMarkPaymentPaid = useCallback(async (id: string) => {
+    try {
+      const { payment } = await api.payments.markPaid(id);
+      setPayments((prev) => prev.map((p) => (p.id === id ? payment : p)));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to mark payment";
+      alert(msg);
+    }
+  }, []);
+
+  const handleDeletePayment = useCallback(async (id: string) => {
+    try {
+      await api.payments.delete(id);
+      setPayments((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to delete payment";
+      alert(msg);
+    }
+  }, []);
+
+  const handleUpdateGroup = useCallback(async (clientId: string, groupId: string, data: Record<string, unknown>) => {
+    try {
+      const { group } = await api.clients.updateGroup(clientId, groupId, data);
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === clientId
+            ? { ...c, client_group: (c.client_group || []).map((g) => g.id === groupId ? group : g) }
+            : c
+        )
+      );
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to update group";
+      alert(msg);
+    }
+  }, []);
+
+  const handleDeleteGroup = useCallback(async (clientId: string, groupId: string) => {
+    try {
+      await api.clients.deleteGroup(clientId, groupId);
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === clientId
+            ? { ...c, client_group: (c.client_group || []).map((g) => g.id === groupId ? { ...g, is_active: false } : g) }
+            : c
+        )
+      );
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to delete group";
       alert(msg);
     }
   }, []);
@@ -336,18 +441,23 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center justify-between shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div>
-            <h1 className="text-base font-semibold text-gray-900">
-              {PAGE_TITLE[view]}
-            </h1>
-            <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-              {new Date().toLocaleDateString("en-IN", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-base font-semibold text-gray-900">
+                {PAGE_TITLE[view]}
+              </h1>
+              <p className="text-[11px] text-gray-400 font-mono mt-0.5">
+                {new Date().toLocaleDateString("en-IN", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
+            {(view === "tasks" || view === "reimbursements" || view === "analytics" || view === "dashboard") && (
+              <DateRangeSelector value={dateRange} onChange={setDateRange} />
+            )}
           </div>
           <div className="flex items-center gap-2">
             {can(userRole, "add_task") && (
@@ -418,8 +528,12 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 {view === "tasks" && (
                   <TasksView
                     tasks={tasks}
+                    payments={payments}
                     onStatusChange={handleTaskStatusChange}
                     onAddTask={() => setShowAddTask(true)}
+                    onCreatePayment={handleCreatePayment}
+                    onMarkPaymentPaid={handleMarkPaymentPaid}
+                    onDeletePayment={handleDeletePayment}
                     userRole={userRole}
                   />
                 )}
@@ -427,8 +541,11 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   <ClientsView
                     clients={clients}
                     tasks={tasks}
+                    payments={payments}
                     onAddClient={handleAddClient}
                     onAddGroup={handleAddGroup}
+                    onUpdateGroup={handleUpdateGroup}
+                    onDeleteGroup={handleDeleteGroup}
                     userRole={userRole}
                   />
                 )}
@@ -445,10 +562,11 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 {view === "reimbursements" && (
                   <ReimbursementsView
                     reimbursements={reimbs}
-                    onAction={(id, a) => {
-                      console.log("Reimbursement action:", id, a);
-                    }}
+                    tasks={tasks}
+                    onAction={handleReimbAction}
+                    onCreateReimb={handleCreateReimb}
                     userRole={userRole}
+                    dateRange={dateRange}
                   />
                 )}
                 {view === "analytics" && (

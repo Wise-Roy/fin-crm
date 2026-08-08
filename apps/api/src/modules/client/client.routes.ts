@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { prisma } from "@repo/db";
 import { authenticate } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/authorization.js';
+import { requireRole } from '../../middleware/authorization.js';
 import { PERMISSIONS } from '../../authorization/permissions.js';
 
 const router = Router();
@@ -21,6 +22,23 @@ router.get(
     const where: Record<string, unknown> = { tenant_id: req.tenant!.id };
     if (search) {
       where.name = { contains: search, mode: "insensitive" };
+    }
+
+    // Date range filtering on created_at
+    if (req.query.startDate || req.query.endDate) {
+      const dateFilter: Record<string, Date> = {};
+      if (req.query.startDate) {
+        const sd = new Date(req.query.startDate as string);
+        if (isNaN(sd.getTime())) { res.status(400).json({ error: "Invalid startDate" }); return; }
+        dateFilter.gte = sd;
+      }
+      if (req.query.endDate) {
+        const ed = new Date(req.query.endDate as string);
+        if (isNaN(ed.getTime())) { res.status(400).json({ error: "Invalid endDate" }); return; }
+        ed.setDate(ed.getDate() + 1);
+        dateFilter.lt = ed;
+      }
+      where.created_at = dateFilter;
     }
 
     const [data, total] = await Promise.all([
@@ -176,6 +194,102 @@ router.delete(
 
     await prisma.client.update({ where: { id: req.params.id as string }, data: { is_active: false, updated_at: new Date() } });
     res.json({ message: "Client deactivated" });
+  },
+);
+
+/** GET /api/clients/:id/revenue — client revenue from task payments (OWNER only) */
+router.get(
+  "/:id/revenue",
+  authenticate,
+  requireRole("OWNER"),
+  async (req: Request, res: Response): Promise<void> => {
+    const clientId = req.params.id as string;
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, tenant_id: req.tenant!.id },
+    });
+    if (!client) { res.status(404).json({ error: "Client not found" }); return; }
+
+    // Sum all SUCCESS payments for tasks belonging to this client
+    const result = await prisma.task_payment.aggregate({
+      where: {
+        tenant_id: req.tenant!.id,
+        payment_status: "SUCCESS",
+        task: { client_id: clientId },
+      },
+      _sum: { amount: true },
+      _count: true,
+    });
+
+    // Also get pending payments
+    const pending = await prisma.task_payment.aggregate({
+      where: {
+        tenant_id: req.tenant!.id,
+        payment_status: "PENDING",
+        task: { client_id: clientId },
+      },
+      _sum: { amount: true },
+      _count: true,
+    });
+
+    res.json({
+      revenue: {
+        total_paid: Number(result._sum.amount || 0),
+        paid_count: result._count,
+        total_pending: Number(pending._sum.amount || 0),
+        pending_count: pending._count,
+      },
+    });
+  },
+);
+
+/** PUT /api/clients/:clientId/groups/:groupId — update group */
+router.put(
+  "/:clientId/groups/:groupId",
+  authenticate,
+  requirePermission(PERMISSIONS.CLIENT_UPDATE),
+  async (req: Request, res: Response): Promise<void> => {
+    const group = await prisma.client_group.findFirst({
+      where: { id: req.params.groupId as string, client_id: req.params.clientId as string, tenant_id: req.tenant!.id },
+    });
+    if (!group) { res.status(404).json({ error: "Group not found" }); return; }
+
+    const { group_name, email, phone, is_active } = req.body as {
+      group_name?: string;
+      email?: string;
+      phone?: string;
+      is_active?: boolean;
+    };
+
+    const updated = await prisma.client_group.update({
+      where: { id: req.params.groupId as string },
+      data: {
+        ...(group_name !== undefined && { group_name }),
+        ...(email !== undefined && { email }),
+        ...(phone !== undefined && { phone }),
+        ...(is_active !== undefined && { is_active }),
+        updated_at: new Date(),
+      },
+    });
+    res.json({ group: updated });
+  },
+);
+
+/** DELETE /api/clients/:clientId/groups/:groupId — deactivate group */
+router.delete(
+  "/:clientId/groups/:groupId",
+  authenticate,
+  requirePermission(PERMISSIONS.CLIENT_DELETE),
+  async (req: Request, res: Response): Promise<void> => {
+    const group = await prisma.client_group.findFirst({
+      where: { id: req.params.groupId as string, client_id: req.params.clientId as string, tenant_id: req.tenant!.id },
+    });
+    if (!group) { res.status(404).json({ error: "Group not found" }); return; }
+
+    await prisma.client_group.update({
+      where: { id: req.params.groupId as string },
+      data: { is_active: false, updated_at: new Date() },
+    });
+    res.json({ message: "Group deactivated" });
   },
 );
 

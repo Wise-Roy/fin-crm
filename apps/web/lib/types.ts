@@ -149,6 +149,46 @@ export interface SubCategory {
   name: string;
 }
 
+export type PaymentStatus = "PENDING" | "SUCCESS" | "FAILED" | "REFUNDED";
+
+export interface TaskPayment {
+  id: string;
+  tenant_id: string;
+  task_id: string;
+  payment_type: string;
+  amount: number;
+  payment_status: PaymentStatus;
+  paid_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  task?: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+    client_id?: string | null;
+    client?: { id: string; name: string } | null;
+  } | null;
+}
+
+export interface TaskHistory {
+  id: string;
+  tenant_id: string;
+  task_id: string;
+  changed_by_user_id?: string | null;
+  action: string;
+  old_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
+  created_at: string;
+  users?: { id: string; name: string } | null;
+}
+
+export interface ClientRevenue {
+  total_paid: number;
+  paid_count: number;
+  total_pending: number;
+  pending_count: number;
+}
+
 export interface Notification {
   id: string;
   title: string;

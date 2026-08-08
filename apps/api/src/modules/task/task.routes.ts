@@ -27,6 +27,24 @@ router.get("/my", authenticate, async (req: Request, res: Response): Promise<voi
   };
   if (req.query.status) where.status = req.query.status;
 
+  // Date range filtering on created_at
+  if (req.query.startDate || req.query.endDate) {
+    const dateFilter: Record<string, Date> = {};
+    if (req.query.startDate) {
+      const sd = new Date(req.query.startDate as string);
+      if (isNaN(sd.getTime())) { res.status(400).json({ error: "Invalid startDate" }); return; }
+      dateFilter.gte = sd;
+    }
+    if (req.query.endDate) {
+      const ed = new Date(req.query.endDate as string);
+      if (isNaN(ed.getTime())) { res.status(400).json({ error: "Invalid endDate" }); return; }
+      // Use next day for exclusive upper bound
+      ed.setDate(ed.getDate() + 1);
+      dateFilter.lt = ed;
+    }
+    where.created_at = dateFilter;
+  }
+
   const [data, total] = await Promise.all([
     prisma.task.findMany({ where: where as any, skip, take: limit, orderBy: { created_at: "desc" }, include: TASK_INCLUDES }),
     prisma.task.count({ where: where as any }),
@@ -54,6 +72,24 @@ router.get(
       where.title = { contains: req.query.search as string, mode: "insensitive" };
     }
 
+    // Date range filtering on created_at
+    if (req.query.startDate || req.query.endDate) {
+      const dateFilter: Record<string, Date> = {};
+      if (req.query.startDate) {
+        const sd = new Date(req.query.startDate as string);
+        if (isNaN(sd.getTime())) { res.status(400).json({ error: "Invalid startDate" }); return; }
+        dateFilter.gte = sd;
+      }
+      if (req.query.endDate) {
+        const ed = new Date(req.query.endDate as string);
+        if (isNaN(ed.getTime())) { res.status(400).json({ error: "Invalid endDate" }); return; }
+        // Use next day for exclusive upper bound
+        ed.setDate(ed.getDate() + 1);
+        dateFilter.lt = ed;
+      }
+      where.created_at = dateFilter;
+    }
+
     const [data, total] = await Promise.all([
       prisma.task.findMany({ where: where as any, skip, take: limit, orderBy: { created_at: "desc" }, include: TASK_INCLUDES }),
       prisma.task.count({ where: where as any }),
@@ -75,6 +111,28 @@ router.get(
     });
     if (!task) { res.status(404).json({ error: "Task not found" }); return; }
     res.json({ task });
+  },
+);
+
+/** GET /api/tasks/:id/history — task status change history */
+router.get(
+  "/:id/history",
+  authenticate,
+  requirePermission(PERMISSIONS.TASK_READ),
+  async (req: Request, res: Response): Promise<void> => {
+    const task = await prisma.task.findFirst({
+      where: { id: req.params.id as string, tenant_id: req.tenant!.id },
+    });
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+
+    const history = await prisma.task_history.findMany({
+      where: { task_id: req.params.id as string },
+      orderBy: { created_at: "desc" },
+      include: {
+        users: { select: { id: true, name: true } },
+      },
+    });
+    res.json({ data: history });
   },
 );
 
@@ -134,11 +192,24 @@ router.patch(
     const data: Record<string, unknown> = { status, updated_at: new Date() };
     if (status === "COMPLETED") data.completed_at = new Date();
 
-    const task = await prisma.task.update({
-      where: { id: req.params.id as string },
-      data: data as any,
-      include: TASK_INCLUDES,
-    });
+    const [task] = await Promise.all([
+      prisma.task.update({
+        where: { id: req.params.id as string },
+        data: data as any,
+        include: TASK_INCLUDES,
+      }),
+      // Log status change to task_history
+      prisma.task_history.create({
+        data: {
+          tenant_id: req.tenant!.id,
+          task_id: req.params.id as string,
+          changed_by_user_id: req.user!.id,
+          action: "status_change",
+          old_value: { status: existing.status },
+          new_value: { status },
+        },
+      }),
+    ]);
     res.json({ task });
   },
 );

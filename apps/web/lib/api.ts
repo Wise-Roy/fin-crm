@@ -1,4 +1,4 @@
-import type { Task, Client, ClientGroup, TeamMember, Reimbursement, Role, JoinRequest, Category, SubCategory } from "./types";
+import type { Task, Client, ClientGroup, TeamMember, Reimbursement, Role, JoinRequest, Category, SubCategory, TaskPayment, TaskHistory, ClientRevenue } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const TOKEN_KEY = "fincrm_token";
@@ -144,6 +144,17 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    updateGroup: (clientId: string, groupId: string, data: Record<string, unknown>) =>
+      request<{ group: ClientGroup }>(`/clients/${encodeURIComponent(clientId)}/groups/${encodeURIComponent(groupId)}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    deleteGroup: (clientId: string, groupId: string) =>
+      request<{ message: string }>(`/clients/${encodeURIComponent(clientId)}/groups/${encodeURIComponent(groupId)}`, {
+        method: "DELETE",
+      }),
+    revenue: (clientId: string) =>
+      request<{ revenue: ClientRevenue }>(`/clients/${encodeURIComponent(clientId)}/revenue`),
   },
 
   tasks: {
@@ -179,6 +190,50 @@ export const api = {
     delete: (id: string) =>
       request<{ message: string }>(`/tasks/${encodeURIComponent(id)}`, {
         method: "DELETE",
+      }),
+    history: (id: string) =>
+      request<{ data: TaskHistory[] }>(`/tasks/${encodeURIComponent(id)}/history`),
+  },
+
+  payments: {
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<PaginatedResponse<TaskPayment>>(`/payments${qs}`);
+    },
+    byTask: (taskId: string) =>
+      request<{ data: TaskPayment[] }>(`/payments/by-task/${encodeURIComponent(taskId)}`),
+    create: (data: { task_id: string; payment_type: string; amount: number }) =>
+      request<{ payment: TaskPayment }>("/payments", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    markPaid: (id: string) =>
+      request<{ payment: TaskPayment }>(`/payments/${encodeURIComponent(id)}/mark-paid`, {
+        method: "PATCH",
+      }),
+    delete: (id: string) =>
+      request<{ message: string }>(`/payments/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }),
+  },
+
+  reimbursements: {
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<PaginatedResponse<Reimbursement>>(`/reimbursements${qs}`);
+    },
+    create: (data: { task_id: string; amount: number; description?: string }) =>
+      request<{ reimbursement: Reimbursement }>("/reimbursements", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    approve: (id: string) =>
+      request<{ reimbursement: Reimbursement }>(`/reimbursements/${encodeURIComponent(id)}/approve`, {
+        method: "PATCH",
+      }),
+    reject: (id: string) =>
+      request<{ reimbursement: Reimbursement }>(`/reimbursements/${encodeURIComponent(id)}/reject`, {
+        method: "PATCH",
       }),
   },
 

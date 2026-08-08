@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { TaskStatus, Priority, ReimbStatus, Role, View } from "./types";
+import type { TaskStatus, Priority, ReimbStatus, PaymentStatus, Role, View } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -95,7 +95,7 @@ export const ROLE_BADGE: Record<Role, string> = {
   EMPLOYEE: "bg-amber-50 text-amber-700",
 };
 
-type Action = "add_task" | "add_client" | "approve_reimb" | "manage_team" | "see_all" | "view_requests";
+type Action = "add_task" | "add_client" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue";
 
 export const can = (role: Role, action: Action): boolean => {
   switch (action) {
@@ -115,6 +115,13 @@ export const can = (role: Role, action: Action): boolean => {
     // OWNER, ADMIN can approve reimbursements
     case "approve_reimb":
       return (["OWNER", "ADMIN"] as Role[]).includes(role);
+    // OWNER, ADMIN can manage payments (create)
+    case "manage_payments":
+      return (["OWNER", "ADMIN"] as Role[]).includes(role);
+    // Only OWNER can mark payment done and view revenue
+    case "mark_payment_done":
+    case "view_revenue":
+      return role === "OWNER";
     default:
       return false;
   }
@@ -136,3 +143,10 @@ export const fmtDate = (s: string) =>
 
 export const isOverdue = (d: string | undefined | null, s: TaskStatus) =>
   !!d && s !== "COMPLETED" && s !== "CANCELLED" && new Date(d) < new Date();
+
+export const PAYMENT_CLS: Record<PaymentStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700",
+  SUCCESS: "bg-emerald-50 text-emerald-700",
+  FAILED: "bg-red-50 text-red-600",
+  REFUNDED: "bg-blue-50 text-blue-700",
+};
