@@ -3,15 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "packageManager": "yarn@4.14.1",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
-  "prisma": {
-    "seed": "tsx src/seed.ts"
-  },
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "scripts": {
     "generate": "prisma generate",
-    "seed": "prisma db seed",
-    "build": "prisma generate"
+    "build": "prisma generate && tsc"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
