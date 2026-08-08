@@ -1,23 +1,15 @@
 import dotenv from "dotenv";
 import path from "path";
-import { defineConfig } from "prisma/config";
+import { defineConfig, env } from "prisma/config";
 
 dotenv.config({
   path: path.resolve(__dirname, "../../.env"),
 });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is missing");
-}
-
 export default defineConfig({
-  schema: "./prisma/schema.prisma",
-
-  migrations: {
-    path: "./prisma/migrations",
-  },
+  schema: "prisma/schema.prisma",
 
   datasource: {
-    url: process.env.DATABASE_URL,
+    url: env("DATABASE_URL"),
   },
 });
