@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "yarn@4.14.1",
   "scripts": {
-    "dev": "tsx watch --env-file=../../.env src/index.ts"
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+     "build": "tsc"
   },
   "dependencies": {
     "@repo/db": "workspace:*",
