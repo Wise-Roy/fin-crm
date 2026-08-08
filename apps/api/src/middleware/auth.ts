@@ -1,12 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
-import { createClient } from "@supabase/supabase-js";
+import jwt from "jsonwebtoken";
 import { prisma } from "@repo/db";
-import type { AuthenticatedUser } from '../types/auth.js';
+import type { AuthenticatedUser } from "../types/auth.js";
+import { DEFAULT_ROLE_PERMISSIONS } from "../authorization/permissions.js";
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 
 export async function authenticate(
   req: Request,
@@ -22,61 +20,44 @@ export async function authenticate(
 
   const token = authHeader.slice(7);
 
-  const {
-    data: { user: authUser },
-    error,
-  } = await supabase.auth.getUser(token);
-
-  if (error || !authUser) {
+  let payload: { userId: string };
+  try {
+    payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+  } catch {
     res.status(401).json({ error: "Invalid or expired token" });
     return;
   }
 
   const appUser = await prisma.user.findUnique({
-    where: { authUserId: authUser.id },
-    include: { tenant: true, role: true },
+    where: { id: payload.userId },
+    include: { tenant: true },
   });
 
   if (!appUser) {
-    res.status(404).json({ error: "User not provisioned" });
+    res.status(404).json({ error: "User not found" });
     return;
   }
 
-  if (appUser.status !== "active") {
+  if (!appUser.is_active) {
     res.status(403).json({ error: "Account is inactive" });
     return;
   }
 
-  if (appUser.tenant.status !== "active") {
-    res.status(403).json({ error: "Tenant is inactive" });
-    return;
-  }
-
-  if (!appUser.role.isActive) {
-    res.status(403).json({ error: "Role is inactive" });
-    return;
-  }
-
-  // Load permissions once per request
-  const rolePermissions = await prisma.rolePermission.findMany({
-    where: { roleId: appUser.role.id },
-    include: { permission: true },
-  });
-
-  const permissions = rolePermissions.map((rp) => rp.permission.key);
+  // Derive permissions from role enum
+  const roleName = appUser.role.toLowerCase();
+  const permissions = DEFAULT_ROLE_PERMISSIONS[roleName] || [];
 
   const authenticatedUser: AuthenticatedUser = {
     id: appUser.id,
-    authUserId: appUser.authUserId,
     email: appUser.email,
-    status: appUser.status,
-    tenant: appUser.tenant,
+    name: appUser.name,
     role: appUser.role,
+    is_active: appUser.is_active,
+    tenantId: appUser.tenantId,
   };
 
   req.user = authenticatedUser;
   req.tenant = appUser.tenant;
-  req.role = appUser.role;
   req.permissions = permissions;
 
   next();

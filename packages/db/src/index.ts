@@ -1,4 +1,5 @@
 export { prisma, PrismaClient } from "./prisma";
 export { supabase } from "./supabase";
-export type { Tenant, TenantSettings, Role, User, Permission, RolePermission } from "../generated/prisma/client";
-export type { RoleName, TenantStatus, TenantPlan } from "../generated/prisma/client";
+export type { User, tenant, task, client, client_group, categories, sub_categories, notifications, task_history, task_payment, task_reimbursement, tenant_config, join_request } from "../generated/prisma/client";
+export type { user_role, task_status, task_priority, payment_status, reimbursement_status, join_request_status } from "../generated/prisma/client";
+export { user_role as UserRole, task_status as TaskStatus, task_priority as TaskPriority } from "../generated/prisma/client";

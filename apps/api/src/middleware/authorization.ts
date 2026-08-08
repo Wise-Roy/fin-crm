@@ -1,12 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
+import type { user_role } from "@repo/db";
 import type { PermissionKey } from '../authorization/permissions.js';
-import type { RoleName } from "@repo/db";
 
 /**
  * Middleware that checks if the authenticated user has a specific permission.
- * Must be used after the authenticate middleware.
- *
- * Usage: router.get("/clients", authenticate, requirePermission("client.read"), handler)
+ * Permissions are derived from role in auth middleware.
  */
 export function requirePermission(permission: PermissionKey) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -26,18 +24,15 @@ export function requirePermission(permission: PermissionKey) {
 
 /**
  * Middleware that checks if the authenticated user has a specific role.
- * Must be used after the authenticate middleware.
- *
- * Usage: router.post("/admin/settings", authenticate, requireRole("owner"), handler)
  */
-export function requireRole(...roles: RoleName[]) {
+export function requireRole(...roles: user_role[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user || !req.role) {
+    if (!req.user) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
 
-    if (!roles.includes(req.role.name)) {
+    if (!roles.includes(req.user.role)) {
       res.status(403).json({ error: "Permission denied" });
       return;
     }

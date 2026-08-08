@@ -1,10 +1,11 @@
 import express from 'express'
 import cors from 'cors'
 import authRoutes from './routes/auth.js'
-import tenantRoutes from './modules/tenant/tenant.routes.js'
-import employeeRoutes from './modules/employee/employee.routes.js'
 import clientRoutes from './modules/client/client.routes.js'
 import taskRoutes from './modules/task/task.routes.js'
+import joinRequestRoutes from './modules/join-request/join-request.routes.js'
+import teamRoutes from './modules/team/team.routes.js'
+import categoryRoutes from './modules/category/category.routes.js'
 import './types/auth'
 
 const app = express();
@@ -16,10 +17,11 @@ app.get('/api/health',(_,res)=>{
 })
 
 app.use('/api/auth', authRoutes);
-app.use('/api/tenant', tenantRoutes);
-app.use('/api/employees', employeeRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/join-requests', joinRequestRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api/categories', categoryRoutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT,()=>{

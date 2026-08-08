@@ -1,170 +1,181 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
+import { prisma } from "@repo/db";
 import { authenticate } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/authorization.js';
 import { PERMISSIONS } from '../../authorization/permissions.js';
-import { clientService } from './client.service.js';
-import { ServiceError } from '../tenant/tenant.service.js';
 
 const router = Router();
 
-function handleError(res: Response, err: unknown): void {
-  if (err instanceof ServiceError) {
-    res.status(err.statusCode).json({ error: err.message });
-    return;
-  }
-  console.error("Client error:", err);
-  res.status(500).json({ error: "Internal server error" });
-}
-
-/**
- * GET /api/clients
- * Paginated, searchable, filterable client list.
- */
+/** GET /api/clients — list clients for tenant */
 router.get(
   "/",
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_READ),
   async (req: Request, res: Response): Promise<void> => {
-    try {
-      const result = await clientService.list(req.tenant!.id, {
-        page: req.query.page ? Number(req.query.page) : undefined,
-        limit: req.query.limit ? Number(req.query.limit) : undefined,
-        sort: req.query.sort as string | undefined,
-        order: req.query.order as "asc" | "desc" | undefined,
-        search: req.query.search as string | undefined,
-        status: req.query.status as string | undefined,
-        clientType: req.query.clientType as string | undefined,
-        accountManagerId: req.query.accountManagerId as string | undefined,
-        state: req.query.state as string | undefined,
-        country: req.query.country as string | undefined,
-        createdFrom: req.query.createdFrom as string | undefined,
-        createdTo: req.query.createdTo as string | undefined,
-        onboardedFrom: req.query.onboardedFrom as string | undefined,
-        onboardedTo: req.query.onboardedTo as string | undefined,
-      });
-      res.json(result);
-    } catch (err) {
-      handleError(res, err);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const search = req.query.search as string | undefined;
+
+    const where: Record<string, unknown> = { tenant_id: req.tenant!.id };
+    if (search) {
+      where.name = { contains: search, mode: "insensitive" };
     }
+
+    const [data, total] = await Promise.all([
+      prisma.client.findMany({
+        where: where as any,
+        skip,
+        take: limit,
+        orderBy: { created_at: "desc" },
+        include: { client_group: { where: { is_active: true }, orderBy: { group_name: "asc" } } },
+      }),
+      prisma.client.count({ where: where as any }),
+    ]);
+
+    res.json({ data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
   },
 );
 
-/**
- * GET /api/clients/:id
- * Client details.
- */
+/** GET /api/clients/:id */
 router.get(
   "/:id",
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_READ),
   async (req: Request, res: Response): Promise<void> => {
-    try {
-      const client = await clientService.getById(req.params.id as string, req.tenant!.id);
-      res.json({ client });
-    } catch (err) {
-      handleError(res, err);
-    }
+    const id = req.params.id as string;
+    const client = await prisma.client.findFirst({
+      where: { id, tenant_id: req.tenant!.id },
+      include: { client_group: { where: { is_active: true }, orderBy: { group_name: "asc" } } },
+    });
+    if (!client) { res.status(404).json({ error: "Client not found" }); return; }
+    res.json({ client });
   },
 );
 
-/**
- * POST /api/clients
- * Create client.
- */
+/** POST /api/clients — create client */
 router.post(
   "/",
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_CREATE),
   async (req: Request, res: Response): Promise<void> => {
-    try {
-      const client = await clientService.create(req.tenant!.id, req.body, req.user!.id);
-      res.status(201).json({ client });
-    } catch (err) {
-      handleError(res, err);
-    }
+    const { name, email, phone } = req.body as { name?: string; email?: string; phone?: string };
+    if (!name) { res.status(400).json({ error: "name is required" }); return; }
+
+    const client = await prisma.client.create({
+      data: {
+        tenant_id: req.tenant!.id,
+        name,
+        email: email || null,
+        phone: phone || null,
+      },
+      include: { client_group: true },
+    });
+    res.status(201).json({ client });
   },
 );
 
-/**
- * PUT /api/clients/:id
- * Update client.
- */
+/** POST /api/clients/quick — adhoc quick-create client (minimal, name only) */
+router.post(
+  "/quick",
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    const { name } = req.body as { name?: string };
+    if (!name || !name.trim()) { res.status(400).json({ error: "name is required" }); return; }
+
+    const tenantId = req.tenant!.id;
+    const trimmed = name.trim();
+
+    // Return existing if found (idempotent)
+    const existing = await prisma.client.findFirst({
+      where: { tenant_id: tenantId, name: { equals: trimmed, mode: "insensitive" } },
+      include: { client_group: { where: { is_active: true }, orderBy: { group_name: "asc" } } },
+    });
+
+    if (existing) {
+      res.json({ client: existing });
+      return;
+    }
+
+    const client = await prisma.client.create({
+      data: { tenant_id: tenantId, name: trimmed },
+      include: { client_group: true },
+    });
+    res.status(201).json({ client });
+  },
+);
+
+/** POST /api/clients/:clientId/groups — create client group */
+router.post(
+  "/:clientId/groups",
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    const clientId = req.params.clientId as string;
+    const { group_name, email, phone } = req.body as { group_name?: string; email?: string; phone?: string };
+    if (!group_name || !group_name.trim()) { res.status(400).json({ error: "group_name is required" }); return; }
+
+    const tenantId = req.tenant!.id;
+    const trimmed = group_name.trim();
+
+    // Verify client belongs to tenant
+    const client = await prisma.client.findFirst({ where: { id: clientId, tenant_id: tenantId } });
+    if (!client) { res.status(404).json({ error: "Client not found" }); return; }
+
+    // Idempotent
+    const existing = await prisma.client_group.findFirst({
+      where: { client_id: clientId, group_name: { equals: trimmed, mode: "insensitive" } },
+    });
+    if (existing) { res.json({ group: existing }); return; }
+
+    const group = await prisma.client_group.create({
+      data: {
+        tenant_id: tenantId,
+        client_id: clientId,
+        group_name: trimmed,
+        email: email || null,
+        phone: phone || null,
+      },
+    });
+    res.status(201).json({ group });
+  },
+);
+
+/** PUT /api/clients/:id — update client */
 router.put(
   "/:id",
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_UPDATE),
   async (req: Request, res: Response): Promise<void> => {
-    try {
-      const client = await clientService.update(req.params.id as string, req.tenant!.id, req.body);
-      res.json({ client });
-    } catch (err) {
-      handleError(res, err);
-    }
+    const existing = await prisma.client.findFirst({ where: { id: req.params.id as string, tenant_id: req.tenant!.id } });
+    if (!existing) { res.status(404).json({ error: "Client not found" }); return; }
+
+    const { name, email, phone, is_active } = req.body as { name?: string; email?: string; phone?: string; is_active?: boolean };
+    const client = await prisma.client.update({
+      where: { id: req.params.id as string },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+        ...(phone !== undefined && { phone }),
+        ...(is_active !== undefined && { is_active }),
+        updated_at: new Date(),
+      },
+    });
+    res.json({ client });
   },
 );
 
-/**
- * PATCH /api/clients/:id/status
- * Update client status.
- */
-router.patch(
-  "/:id/status",
-  authenticate,
-  requirePermission(PERMISSIONS.CLIENT_UPDATE),
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { status } = req.body as { status: string };
-      if (!status) {
-        res.status(400).json({ error: "status is required" });
-        return;
-      }
-      const client = await clientService.updateStatus(req.params.id as string, req.tenant!.id, status);
-      res.json({ client });
-    } catch (err) {
-      handleError(res, err);
-    }
-  },
-);
-
-/**
- * PATCH /api/clients/:id/account-manager
- * Assign or change account manager.
- */
-router.patch(
-  "/:id/account-manager",
-  authenticate,
-  requirePermission(PERMISSIONS.CLIENT_UPDATE),
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { accountManagerId } = req.body as { accountManagerId: string | null };
-      const client = await clientService.assignAccountManager(
-        req.params.id as string,
-        req.tenant!.id,
-        accountManagerId,
-      );
-      res.json({ client });
-    } catch (err) {
-      handleError(res, err);
-    }
-  },
-);
-
-/**
- * DELETE /api/clients/:id
- * Soft archive client.
- */
+/** DELETE /api/clients/:id — deactivate */
 router.delete(
   "/:id",
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_DELETE),
   async (req: Request, res: Response): Promise<void> => {
-    try {
-      await clientService.softDelete(req.params.id as string, req.tenant!.id);
-      res.json({ message: "Client archived" });
-    } catch (err) {
-      handleError(res, err);
-    }
+    const existing = await prisma.client.findFirst({ where: { id: req.params.id as string, tenant_id: req.tenant!.id } });
+    if (!existing) { res.status(404).json({ error: "Client not found" }); return; }
+
+    await prisma.client.update({ where: { id: req.params.id as string }, data: { is_active: false, updated_at: new Date() } });
+    res.json({ message: "Client deactivated" });
   },
 );
 
