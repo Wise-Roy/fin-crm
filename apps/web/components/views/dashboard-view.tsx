@@ -6,8 +6,6 @@ import { motion } from "motion/react";
 import type { Task, Client, TeamMember, Reimbursement, PendingMember, Role } from "@/lib/types";
 import { PRIORITY_DOT, can, fmtINR, fmtDate, isOverdue, getInitials } from "@/lib/utils";
 import { StatusBadge, Av } from "@/components/ui-atoms";
-import { DateRangeSelector } from "@/components/date-range-selector";
-import type { DateRange } from "@/components/date-range-selector";
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -26,8 +24,6 @@ export function DashboardView({
   onOpenApproval,
   userRole,
   userName,
-  dateRange,
-  onDateRangeChange,
 }: {
   tasks: Task[];
   clients: Client[];
@@ -38,8 +34,6 @@ export function DashboardView({
   onOpenApproval: (m: PendingMember) => void;
   userRole: Role;
   userName: string;
-  dateRange: DateRange;
-  onDateRangeChange: (range: DateRange) => void;
 }) {
   const stats = useMemo(
     () => ({
@@ -74,19 +68,14 @@ export function DashboardView({
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div className="flex items-end justify-between">
-        <div>
-          <motion.h1
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-semibold text-gray-900"
-          >
-            {getGreeting()}, {firstName}
-          </motion.h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <DateRangeSelector value={dateRange} onChange={onDateRangeChange} />
-        </div>
+      <div>
+        <motion.h1
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl font-semibold text-gray-900"
+        >
+          {getGreeting()}, {firstName}
+        </motion.h1>
       </div>
 
       {/* Pending approvals */}

@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    setState((s) => ({ ...s, loading: true, error: null }));
+    setState((s) => ({ ...s, error: null }));
     try {
       const res = await api.auth.login({ email, password });
       setToken(res.token);
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(
     async (name: string, email: string, password: string, organizationName: string) => {
-      setState((s) => ({ ...s, loading: true, error: null }));
+      setState((s) => ({ ...s, error: null }));
       try {
         const res = await api.auth.signup({ name, email, password, organizationName });
         setToken(res.token);

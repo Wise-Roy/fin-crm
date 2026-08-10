@@ -101,7 +101,7 @@ export function DateRangeSelector({
     <div className="relative inline-block" ref={ref}>
       <button
         onClick={() => { setOpen(!open); if (!open) setShowCustom(false); }}
-        className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+        className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10"
       >
         <Calendar size={12} className="text-gray-400" />
         <span className="text-gray-700">{getLabel(value)}</span>

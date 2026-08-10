@@ -443,10 +443,10 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
           className="border-b px-5 py-5 flex items-center justify-between shrink-0 shadow-sm"
           style={{ backgroundColor: navbarBg, borderColor: `${navbarFg}08` }}
         >
-          {/* Left: search */}
-          <div className="hidden md:flex items-start max-w-xs flex-1 mx-8">
-            <div className="relative w-full">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          {/* Left: search + date */}
+          <div className="hidden md:flex items-center gap-2 max-w-lg flex-1 mx-8">
+            <div className="relative w-full max-w-xs">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search..."
@@ -455,6 +455,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 readOnly
               />
             </div>
+            <DateRangeSelector value={dateRange} onChange={setDateRange} />
           </div>
 
           {/* Right: actions */}
@@ -519,8 +520,6 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   onOpenApproval={() => setView("team")}
                   userRole={userRole}
                   userName={appUser?.name || ""}
-                  dateRange={dateRange}
-                  onDateRangeChange={setDateRange}
                 />
               )}
               {view === "tasks" && (
