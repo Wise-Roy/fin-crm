@@ -1,6 +1,7 @@
 "use client";
 
-import { FileCheck, Building2, Users, Receipt, Shield, ArrowRight } from "lucide-react";
+import { FileCheck, Building2, Users, Receipt, ListTodo, ArrowRight } from "lucide-react";
+
 import { motion } from "motion/react";
 
 const features = [
@@ -39,9 +40,9 @@ export function LandingPage({
       <nav className="fixed top-0 inset-x-0 z-30 bg-white/95 backdrop-blur-xl border-b border-gray-200/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 bg-gray-900 rounded-xl flex items-center justify-center">
-              <Shield size={20} className="text-white" />
-            </div>
+            
+              <ListTodo size={24} className="text-black" />
+            
             <span className="text-xl font-bold text-gray-900 tracking-tight">
               FinCRM
             </span>
@@ -95,7 +96,7 @@ export function LandingPage({
             >
 
              <h1 className="font-semibold text-white leading-[1.05] tracking-tight">
-  <span className="block text-6xl sm:text-7xl lg:text-[5rem]">
+  <span className="block text-6xl sm:text-7xl lg:text-[4rem]">
     Every deadline.
   </span>
 
@@ -154,7 +155,7 @@ export function LandingPage({
                   <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
                   <div className="flex-1 flex justify-center">
                     <div className="bg-white/[0.04] rounded-md px-8 py-1">
-                      <span className="text-[10px] text-white/20 font-mono">
+                      <span className="text-xs text-white/20 ">
                         app.fincrm.io
                       </span>
                     </div>
@@ -174,7 +175,7 @@ export function LandingPage({
                     ].map((n, i) => (
                       <div
                         key={n}
-                        className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${i === 0 ? "bg-white text-[#0A0A0A]" : "text-white/25 hover:text-white/40"}`}
+                        className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${i === 0 ? "bg-white text-[#0A0A0A]" : "text-white/25 hover:text-white/40"}`}
                       >
                         {n}
                       </div>
@@ -198,11 +199,11 @@ export function LandingPage({
                           className="bg-white/[0.03] border border-white/[0.05] rounded-lg p-2.5"
                         >
                           <div
-                            className={`text-sm font-mono font-semibold ${c}`}
+                            className={`text-sm  font-semibold ${c}`}
                           >
                             {v}
                           </div>
-                          <div className="text-white/25 text-[9px] mt-0.5 font-medium">
+                          <div className="text-white/25 text-xs mt-0.5 font-medium">
                             {l}
                           </div>
                         </div>
@@ -212,7 +213,7 @@ export function LandingPage({
                     {/* Task list */}
                     <div className="bg-white/[0.02] border border-white/[0.05] rounded-lg overflow-hidden">
                       <div className="px-3 py-2 border-b border-white/[0.05]">
-                        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider">
+                        <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">
                           Recent Tasks
                         </span>
                       </div>
@@ -253,14 +254,14 @@ export function LandingPage({
                               className={`w-1 h-5 rounded-full ${dot} shrink-0`}
                             />
                             <div className="flex-1 min-w-0">
-                              <div className="text-[11px] font-medium text-white/60 truncate">
+                              <div className="text-xs font-medium text-white/60 truncate">
                                 {task}
                               </div>
-                              <div className="text-[9px] text-white/25 mt-0.5">
+                              <div className="text-xs text-white/25 mt-0.5">
                                 {client}
                               </div>
                             </div>
-                            <span className="text-[9px] text-white/30 font-mono shrink-0">
+                            <span className="text-xs text-white/30  shrink-0">
                               {status}
                             </span>
                           </div>
@@ -270,7 +271,7 @@ export function LandingPage({
 
                     {/* Mini chart placeholder */}
                     <div className="bg-white/[0.02] border border-white/[0.05] rounded-lg p-3">
-                      <div className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2">
+                      <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
                         Team Workload
                       </div>
                       <div className="space-y-2">
@@ -285,7 +286,7 @@ export function LandingPage({
                             className="flex items-center gap-2"
                           >
                             <div className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center">
-                              <span className="text-[7px] font-mono font-semibold text-white/40">
+                              <span className="text-xs  font-semibold text-white/40">
                                 {initials}
                               </span>
                             </div>
@@ -346,7 +347,7 @@ export function LandingPage({
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {f.title}
                 </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
+                <p className="text-sm text-gray-500 leading-relaxed">
                   {f.desc}
                 </p>
               </motion.div>
@@ -365,13 +366,13 @@ export function LandingPage({
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
             >
-              <div className="text-md font-medium text-gray-400 uppercase tracking-widest mb-3">
+              <div className="text-base font-medium text-gray-400 uppercase tracking-widest mb-3">
                 Role-Based Access
               </div>
               <h2 className="text-5xl font-semibold text-gray-900 mb-4">
                 Everyone sees exactly what they need to
               </h2>
-              <p className="text-gray-500 text-md leading-relaxed mb-6">
+              <p className="text-gray-500 text-base leading-relaxed mb-6">
                 Super Admin sets up the firm, approves new members, and has
                 complete visibility. Managers oversee all tasks. CS Executives
                 manage their own pipeline. Trainees stay focused on assigned
@@ -418,7 +419,7 @@ export function LandingPage({
               transition={{ duration: 0.5, delay: 0.1 }}
               className="bg-[#0A0A0A] rounded-2xl p-6 text-white space-y-4"
             >
-              <div className="text-xs text-white/40 font-mono mb-2">
+              <div className="text-xs text-white/40  mb-2">
                 New member request
               </div>
               {[
@@ -430,7 +431,7 @@ export function LandingPage({
                   className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-xs font-mono">
+                    <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-xs ">
                       {m.n
                         .split(" ")
                         .map((x) => x[0])
@@ -438,16 +439,16 @@ export function LandingPage({
                     </div>
                     <div>
                       <div className="text-sm font-medium">{m.n}</div>
-                      <div className="text-xs text-white/40 font-mono">
+                      <div className="text-xs text-white/40 ">
                         {m.e}
                       </div>
                     </div>
                   </div>
                   <div className="flex gap-1.5">
-                    <div className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-medium">
+                    <div className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-medium">
                       Approve
                     </div>
-                    <div className="text-[10px] bg-red-500/10 text-red-400 px-2 py-1 rounded font-medium">
+                    <div className="text-xs bg-red-500/10 text-red-400 px-2 py-1 rounded font-medium">
                       Reject
                     </div>
                   </div>
@@ -496,14 +497,10 @@ export function LandingPage({
       </section>
 
       <footer className="bg-white border-t border-white/5 py-6">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield size={18} className="text-black" />
-            <span className="text-md text-black font-mono">
-              FinCRM — Company Secretary Suite
+        <div className="max-w-6xl mx-auto px-6 flex items-center justify-center">
+            <span className="text-base text-black font-semibold">
+              © 2026 FinCRM — Company Secretary Suite
             </span>
-          </div>
-          <span className="text-md text-black font-mono">© 2024</span>
         </div>
       </footer>
     </div>

@@ -241,7 +241,7 @@ export function QuickAddModal({
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100 max-h-[90vh] overflow-y-auto">
               <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-50">
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900">
+                  <h2 className="typo-card-title text-gray-900">
                     Quick Add Task
                   </h2>
                   <p className="text-xs text-gray-400 mt-0.5">
@@ -257,7 +257,7 @@ export function QuickAddModal({
               </div>
               <form onSubmit={submit} className="px-6 py-4 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                  <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
                     Title *
                   </label>
                   <input
@@ -302,7 +302,7 @@ export function QuickAddModal({
                 />
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                  <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
                     Assign To
                   </label>
                   <select
@@ -321,7 +321,7 @@ export function QuickAddModal({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                    <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
                       Priority
                     </label>
                     <select
@@ -336,7 +336,7 @@ export function QuickAddModal({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                    <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
                       Due Date
                     </label>
                     <input

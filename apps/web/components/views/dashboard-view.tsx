@@ -1,11 +1,20 @@
 "use client";
 
 import { useMemo } from "react";
-import { ListTodo, AlertCircle, TrendingUp, Receipt, Plus } from "lucide-react";
+import { ListTodo, AlertCircle, TrendingUp, Receipt, Plus, ArrowRight, Clock } from "lucide-react";
 import { motion } from "motion/react";
 import type { Task, Client, TeamMember, Reimbursement, PendingMember, Role } from "@/lib/types";
-import { STATUS_CFG, can, fmtINR, fmtDate, isOverdue, getInitials } from "@/lib/utils";
+import { PRIORITY_DOT, can, fmtINR, fmtDate, isOverdue, getInitials } from "@/lib/utils";
 import { StatusBadge, Av } from "@/components/ui-atoms";
+import { DateRangeSelector } from "@/components/date-range-selector";
+import type { DateRange } from "@/components/date-range-selector";
+
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export function DashboardView({
   tasks,
@@ -16,6 +25,9 @@ export function DashboardView({
   pendingMembers,
   onOpenApproval,
   userRole,
+  userName,
+  dateRange,
+  onDateRangeChange,
 }: {
   tasks: Task[];
   clients: Client[];
@@ -25,6 +37,9 @@ export function DashboardView({
   pendingMembers: PendingMember[];
   onOpenApproval: (m: PendingMember) => void;
   userRole: Role;
+  userName: string;
+  dateRange: DateRange;
+  onDateRangeChange: (range: DateRange) => void;
 }) {
   const stats = useMemo(
     () => ({
@@ -32,229 +47,211 @@ export function DashboardView({
       active: tasks.filter((t) => t.status === "IN_PROGRESS").length,
       overdue: tasks.filter((t) => isOverdue(t.due_date, t.status)).length,
       done: tasks.filter((t) => t.status === "COMPLETED").length,
-      pendingReimb: reimbursements
-        .filter((r) => r.status === "PENDING")
-        .reduce((s, r) => s + r.amount, 0),
-      pendingReimbCount: reimbursements.filter((r) => r.status === "PENDING")
-        .length,
+      pendingReimb: reimbursements.filter((r) => r.status === "PENDING").reduce((s, r) => s + r.amount, 0),
+      pendingReimbCount: reimbursements.filter((r) => r.status === "PENDING").length,
     }),
     [tasks, reimbursements]
   );
 
-  const recentTasks = tasks.slice(0, 6);
+  // Today's focus: overdue + in-progress tasks, sorted by priority
+  const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+  const focusTasks = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.status !== "COMPLETED" && t.status !== "CANCELLED")
+        .sort((a, b) => {
+          const od = (t: Task) => isOverdue(t.due_date, t.status) ? -1 : 0;
+          const diff = od(a) - od(b);
+          if (diff !== 0) return diff;
+          return (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
+        })
+        .slice(0, 8),
+    [tasks]
+  );
+
+  const firstName = userName?.split(" ")[0] || "";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* Greeting */}
+      <div className="flex items-end justify-between">
+        <div>
+          <motion.h1
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-2xl font-semibold text-gray-900"
+          >
+            {getGreeting()}, {firstName}
+          </motion.h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <DateRangeSelector value={dateRange} onChange={onDateRangeChange} />
+        </div>
+      </div>
+
+      {/* Pending approvals */}
       {(userRole === "OWNER" || userRole === "ADMIN") && pendingMembers.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -8 }}
+          initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-50 border border-amber-200 rounded-xl p-4"
+          className="bg-amber-50/80 border border-amber-200/60 rounded-xl px-4 py-3 flex items-center gap-3"
         >
-          <div className="flex items-center gap-2 mb-3">
-            <AlertCircle size={14} className="text-amber-600 shrink-0" />
-            <span className="text-sm font-semibold text-amber-900">
-              {pendingMembers.length} member
-              {pendingMembers.length > 1 ? "s" : ""} awaiting your approval
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {pendingMembers.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => onOpenApproval(m)}
-                className="flex items-center gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2 hover:border-gray-900 hover:shadow-sm transition-all text-left"
-              >
-                <div className="w-7 h-7 bg-gray-900 text-white rounded-full flex items-center justify-center font-mono text-[10px] font-semibold shrink-0">
-                  {getInitials(m.name)}
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">
-                    {m.name}
-                  </div>
-                  <div className="text-[11px] text-gray-400 font-mono">
-                    {m.email}
-                  </div>
-                </div>
-                <span className="ml-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                  Assign Role
-                </span>
-              </button>
-            ))}
-          </div>
+          <AlertCircle size={16} className="text-amber-600 shrink-0" />
+          <span className="text-sm text-amber-900 flex-1">
+            <strong>{pendingMembers.length}</strong> member{pendingMembers.length > 1 ? "s" : ""} awaiting approval
+          </span>
+          <button
+            onClick={() => onOpenApproval(pendingMembers[0]!)}
+            className="text-xs font-medium text-amber-700 hover:text-amber-900 flex items-center gap-1 transition-colors"
+          >
+            Review <ArrowRight size={12} />
+          </button>
         </motion.div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          {
-            label: "Total Tasks",
-            value: stats.total,
-            sub: `${stats.active} in progress`,
-            icon: ListTodo,
-            alert: false,
-          },
-          {
-            label: "Overdue",
-            value: stats.overdue,
-            sub: "Needs attention",
-            icon: AlertCircle,
-            alert: stats.overdue > 0,
-          },
-          {
-            label: "Active Clients",
-            value: clients.length,
-            sub: `${stats.done} tasks completed`,
-            icon: TrendingUp,
-            alert: false,
-          },
-          {
-            label: "Pending Reimb.",
-            value: fmtINR(stats.pendingReimb),
-            sub: `${stats.pendingReimbCount} requests`,
-            icon: Receipt,
-            alert: false,
-          },
+          { label: "Open Tasks", value: stats.total - stats.done, icon: ListTodo, alert: false, sub: `${stats.active} in progress` },
+          { label: "Overdue", value: stats.overdue, icon: AlertCircle, alert: stats.overdue > 0, sub: "Needs attention" },
+          { label: "Active Clients", value: clients.length, icon: TrendingUp, alert: false, sub: `${stats.done} completed` },
+          { label: "Pending Reimb.", value: fmtINR(stats.pendingReimb), icon: Receipt, alert: false, sub: `${stats.pendingReimbCount} requests` },
         ].map((s, i) => (
           <motion.div
             key={s.label}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
-            className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+            transition={{ delay: i * 0.05 }}
+            className="bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-colors"
           >
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
-                {s.label}
-              </span>
-              <s.icon
-                size={13}
-                className={s.alert ? "text-red-400" : "text-gray-200"}
-              />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{s.label}</span>
+              <s.icon size={16} className={s.alert ? "text-red-400" : "text-gray-300"} />
             </div>
-            <div
-              className={`text-2xl font-mono font-semibold tracking-tight ${s.alert ? "text-red-600" : "text-gray-900"}`}
-            >
+            <div className={`text-xl font-semibold tracking-tight ${s.alert ? "text-red-600" : "text-gray-900"}`}>
               {s.value}
             </div>
-            <div className="text-xs text-gray-400 mt-1">{s.sub}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <h3 className="text-sm font-semibold text-gray-900">
-              Recent Tasks
-            </h3>
-            {can(userRole, "add_task") && (
-              <button
-                onClick={onAddTask}
-                className="flex items-center gap-1.5 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors font-medium shadow-sm"
-              >
-                <Plus size={11} /> Quick Add
-              </button>
-            )}
+      {/* Main content: Tasks + Team Workload */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Today's Focus — dominant task list */}
+        <div className="lg:col-span-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-900">Today&apos;s Focus</h3>
+              <span className="text-xs text-gray-400">{focusTasks.length} tasks</span>
+            </div>
           </div>
-          <div className="divide-y divide-gray-50">
-            {recentTasks.length === 0 && (
-              <div className="text-center py-10 text-sm text-gray-400">
-                No tasks yet
+
+          {focusTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center mb-3">
+                <ListTodo size={20} className="text-gray-300" />
               </div>
-            )}
-            {recentTasks.map((task, i) => {
-              const assignee = task.users_task_assigned_to_employee_idTousers;
-              return (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors"
+              <p className="text-sm text-gray-500 mb-1">No active tasks</p>
+              <p className="text-xs text-gray-400 mb-4">Create your first task to get started</p>
+              {can(userRole, "add_task") && (
+                <button
+                  onClick={onAddTask}
+                  className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
                 >
-                  <div
-                    className={`w-0.5 h-9 rounded-full ${STATUS_CFG[task.status].bar}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {task.title}
-                      </p>
-                      {task.categories && (
-                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono shrink-0">
-                          {task.categories.name}
+                  <Plus size={13} /> Add Task
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {focusTasks.map((task, i) => {
+                const assignee = task.users_task_assigned_to_employee_idTousers;
+                const overdue = isOverdue(task.due_date, task.status);
+                return (
+                  <motion.div
+                    key={task.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50/50 transition-colors"
+                  >
+                    {/* Priority indicator */}
+                    <div className={`w-1 h-8 rounded-full shrink-0 ${PRIORITY_DOT[task.priority]}`} />
+
+                    {/* Task info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                        {overdue && (
+                          <span className="text-xs text-red-500 font-medium shrink-0">Overdue</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-gray-400 truncate">{task.client?.name || "No client"}</span>
+                        {task.categories && (
+                          <>
+                            <span className="text-gray-200">·</span>
+                            <span className="text-xs text-gray-400">{task.categories.name}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right side */}
+                    <div className="hidden sm:flex items-center gap-3 shrink-0">
+                      <Av initials={assignee ? getInitials(assignee.name) : "?"} size="sm" />
+                      <StatusBadge status={task.status} />
+                      {task.due_date && (
+                        <span className={`text-xs whitespace-nowrap ${overdue ? "text-red-500 font-semibold" : "text-gray-400"}`}>
+                          {fmtDate(task.due_date)}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 truncate mt-0.5">
-                      {task.client?.name || "No client"}
-                    </p>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-2 shrink-0">
-                    <Av
-                      initials={assignee ? getInitials(assignee.name) : "?"}
-                      size="sm"
-                    />
-                    <StatusBadge status={task.status} />
-                  </div>
-                  {task.due_date && (
-                    <span
-                      className={`text-xs font-mono shrink-0 ${isOverdue(task.due_date, task.status) ? "text-red-500 font-semibold" : "text-gray-400"}`}
-                    >
-                      {fmtDate(task.due_date)}
-                    </span>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-50">
-            <h3 className="text-sm font-semibold text-gray-900">
-              Team Workload
-            </h3>
+        {/* Team Workload — compact right panel */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3.5 border-b border-gray-50">
+            <h3 className="text-sm font-semibold text-gray-900">Team</h3>
           </div>
-          <div className="p-4 space-y-4">
-            {teamMembers.length === 0 && (
-              <p className="text-xs text-gray-400">No team members</p>
-            )}
-            {teamMembers.map((member) => {
-              const active = tasks.filter(
-                (t) => t.assigned_to_employee_id === member.id && t.status !== "COMPLETED" && t.status !== "CANCELLED"
-              ).length;
-              return (
-                <div key={member.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Av initials={getInitials(member.name)} size="sm" />
-                      <span className="text-xs font-medium text-gray-700">
-                        {member.name.split(" ")[0]}
-                      </span>
+          <div className="p-3 space-y-3">
+            {teamMembers.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">No team members</p>
+            ) : (
+              teamMembers.map((member) => {
+                const active = tasks.filter(
+                  (t) => t.assigned_to_employee_id === member.id && t.status !== "COMPLETED" && t.status !== "CANCELLED"
+                ).length;
+                return (
+                  <div key={member.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Av initials={getInitials(member.name)} size="sm" />
+                        <span className="text-xs font-medium text-gray-700 truncate max-w-[80px]">
+                          {member.name.split(" ")[0]}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400 tabular-nums">{active}</span>
                     </div>
-                    <span className="text-xs text-gray-400 font-mono">
-                      {active}
-                    </span>
+                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min((active / 5) * 100, 100)}%` }}
+                        transition={{ delay: 0.3, duration: 0.5, ease: "easeOut" }}
+                        className={`h-full rounded-full ${active >= 5 ? "bg-red-400" : active >= 3 ? "bg-amber-400" : "bg-gray-900"}`}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{
-                        width: `${Math.min((active / 5) * 100, 100)}%`,
-                      }}
-                      transition={{
-                        delay: 0.4,
-                        duration: 0.5,
-                        ease: "easeOut",
-                      }}
-                      className={`h-full rounded-full ${active >= 5 ? "bg-red-400" : active >= 3 ? "bg-amber-400" : "bg-gray-900"}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>

@@ -15,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body style={{ fontFamily: "var(--font-sans, 'DM Sans', sans-serif)" }}>
+      <body style={{ fontFamily: "var(--font-sans, 'Inter', sans-serif)" }}>
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -14,17 +15,21 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import type { Task, Client, TeamMember } from "@/lib/types";
+import type { Task, Client, TeamMember, Role } from "@/lib/types";
 
 export function AnalyticsView({
   tasks,
   clients,
   teamMembers,
+  userRole,
 }: {
   tasks: Task[];
   clients: Client[];
   teamMembers: TeamMember[];
+  userRole: Role;
 }) {
+  const [empFilter, setEmpFilter] = useState<string>("all");
+
   // Group tasks by month
   const monthlyMap = new Map<string, { added: number; done: number }>();
   tasks.forEach((t) => {
@@ -37,11 +42,22 @@ export function AnalyticsView({
   });
   const monthlyData = Array.from(monthlyMap.entries()).map(([m, v]) => ({ m, ...v }));
 
-  const empData = teamMembers.map((e) => ({
-    name: e.name.split(" ")[0],
-    completed: tasks.filter((t) => t.assigned_to_employee_id === e.id && t.status === "COMPLETED").length,
-    active: tasks.filter((t) => t.assigned_to_employee_id === e.id && t.status !== "COMPLETED" && t.status !== "CANCELLED").length,
-  }));
+  // Employee data — sorted by total work (completed + active), top 5
+  const allEmpData = useMemo(() =>
+    teamMembers
+      .map((e) => {
+        const completed = tasks.filter((t) => t.assigned_to_employee_id === e.id && t.status === "COMPLETED").length;
+        const active = tasks.filter((t) => t.assigned_to_employee_id === e.id && t.status !== "COMPLETED" && t.status !== "CANCELLED").length;
+        return { id: e.id, name: e.name.split(" ")[0], fullName: e.name, completed, active, total: completed + active };
+      })
+      .sort((a, b) => b.total - a.total),
+    [teamMembers, tasks]
+  );
+
+  const empData = useMemo(() => {
+    if (empFilter === "all") return allEmpData.slice(0, 5);
+    return allEmpData.filter((e) => e.id === empFilter);
+  }, [allEmpData, empFilter]);
 
   // Tasks per client
   const clientData = clients
@@ -53,31 +69,11 @@ export function AnalyticsView({
     .slice(0, 8);
 
   const statusData = [
-    {
-      name: "To Do",
-      value: tasks.filter((t) => t.status === "TODO").length,
-      color: "#9CA3AF",
-    },
-    {
-      name: "In Progress",
-      value: tasks.filter((t) => t.status === "IN_PROGRESS").length,
-      color: "#374151",
-    },
-    {
-      name: "Waiting Client",
-      value: tasks.filter((t) => t.status === "WAITING_CLIENT").length,
-      color: "#F97316",
-    },
-    {
-      name: "Review",
-      value: tasks.filter((t) => t.status === "REVIEW").length,
-      color: "#F59E0B",
-    },
-    {
-      name: "Completed",
-      value: tasks.filter((t) => t.status === "COMPLETED").length,
-      color: "#10B981",
-    },
+    { name: "To Do", value: tasks.filter((t) => t.status === "TODO").length, color: "#9CA3AF" },
+    { name: "In Progress", value: tasks.filter((t) => t.status === "IN_PROGRESS").length, color: "#374151" },
+    { name: "Waiting Client", value: tasks.filter((t) => t.status === "WAITING_CLIENT").length, color: "#F97316" },
+    { name: "Review", value: tasks.filter((t) => t.status === "REVIEW").length, color: "#F59E0B" },
+    { name: "Completed", value: tasks.filter((t) => t.status === "COMPLETED").length, color: "#10B981" },
   ].filter((s) => s.value > 0);
 
   const ttp = {
@@ -92,11 +88,13 @@ export function AnalyticsView({
     cursor: { stroke: "#f3f4f6" },
   };
 
+  const isOwner = userRole === "OWNER";
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-5">
+          <h3 className="typo-card-title text-gray-900 mb-5">
             Monthly Task Volume
           </h3>
           {monthlyData.length === 0 ? (
@@ -118,133 +116,71 @@ export function AnalyticsView({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis
-                  dataKey="m"
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+                <XAxis dataKey="m" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <Tooltip {...ttp} />
-                <Area
-                  type="monotone"
-                  dataKey="added"
-                  stroke="#d1d5db"
-                  fill="url(#ga)"
-                  name="Added"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="done"
-                  stroke="#111827"
-                  strokeWidth={2}
-                  fill="url(#gd)"
-                  name="Completed"
-                />
+                <Area type="monotone" dataKey="added" stroke="#d1d5db" fill="url(#ga)" name="Added" />
+                <Area type="monotone" dataKey="done" stroke="#111827" strokeWidth={2} fill="url(#gd)" name="Completed" />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
 
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-5">
+          <h3 className="typo-card-title text-gray-900 mb-5">
             Tasks by Client
           </h3>
           {clientData.length === 0 ? (
             <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">No data yet</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={clientData}
-                margin={{ top: 4, right: 4, bottom: 0, left: -24 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f3f4f6"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
+              <BarChart data={clientData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <Tooltip {...ttp} />
-                <Bar
-                  dataKey="tasks"
-                  fill="#111827"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={44}
-                  name="Tasks"
-                />
+                <Bar dataKey="tasks" fill="#111827" radius={[4, 4, 0, 0]} maxBarSize={44} name="Tasks" />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-5">
-            Employee Performance
-          </h3>
-          {empData.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">No data yet</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart
-                data={empData}
-                layout="vertical"
-                margin={{ top: 4, right: 4, bottom: 0, left: 8 }}
+        {isOwner && (
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="typo-card-title text-gray-900">
+                Employee Performance
+              </h3>
+              <select
+                value={empFilter}
+                onChange={(e) => setEmpFilter(e.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none cursor-pointer"
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f3f4f6"
-                  horizontal={false}
-                />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11, fill: "#9ca3af" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tick={{ fontSize: 11, fill: "#6b7280" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={48}
-                />
-                <Tooltip {...ttp} />
-                <Bar
-                  dataKey="completed"
-                  fill="#111827"
-                  radius={[0, 4, 4, 0]}
-                  name="Completed"
-                  maxBarSize={16}
-                />
-                <Bar
-                  dataKey="active"
-                  fill="#e5e7eb"
-                  radius={[0, 4, 4, 0]}
-                  name="Active"
-                  maxBarSize={16}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+                <option value="all">Top 5</option>
+                {allEmpData.map((e) => (
+                  <option key={e.id} value={e.id}>{e.fullName}</option>
+                ))}
+              </select>
+            </div>
+            {empData.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-sm text-gray-400">No data yet</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={empData} layout="vertical" margin={{ top: 4, right: 4, bottom: 0, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} width={48} />
+                  <Tooltip {...ttp} />
+                  <Bar dataKey="completed" fill="#111827" radius={[0, 4, 4, 0]} name="Completed" maxBarSize={16} />
+                  <Bar dataKey="active" fill="#e5e7eb" radius={[0, 4, 4, 0]} name="Active" maxBarSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        )}
 
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-5">
+          <h3 className="typo-card-title text-gray-900 mb-5">
             Status Distribution
           </h3>
           {statusData.length === 0 ? (
@@ -253,15 +189,7 @@ export function AnalyticsView({
             <div className="flex items-center gap-6">
               <ResponsiveContainer width={160} height={160}>
                 <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={48}
-                    outerRadius={72}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
+                  <Pie data={statusData} cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={3} dataKey="value">
                     {statusData.map((entry, idx) => (
                       <Cell key={idx} fill={entry.color} />
                     ))}
@@ -271,25 +199,17 @@ export function AnalyticsView({
               </ResponsiveContainer>
               <div className="space-y-3 flex-1">
                 {statusData.map((s) => (
-                  <div
-                    key={s.name}
-                    className="flex items-center justify-between"
-                  >
+                  <div key={s.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div
-                        className="w-2.5 h-2.5 rounded-sm shrink-0"
-                        style={{ background: s.color }}
-                      />
+                      <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
                       <span className="text-xs text-gray-600">{s.name}</span>
                     </div>
-                    <span className="text-xs font-mono font-semibold text-gray-900">
-                      {s.value}
-                    </span>
+                    <span className="text-xs font-semibold text-gray-900">{s.value}</span>
                   </div>
                 ))}
                 <div className="pt-1 border-t border-gray-100 flex items-center justify-between">
                   <span className="text-xs text-gray-400">Total</span>
-                  <span className="text-xs font-mono font-semibold text-gray-900">
+                  <span className="text-xs font-semibold text-gray-900">
                     {statusData.reduce((s, d) => s + d.value, 0)}
                   </span>
                 </div>

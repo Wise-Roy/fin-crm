@@ -36,7 +36,7 @@ export function NotifPanel({
             className="absolute right-0 top-12 z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
-              <span className="text-sm font-semibold text-gray-900">
+              <span className="typo-card-title text-gray-900">
                 Notifications
               </span>
               <button
@@ -68,7 +68,7 @@ export function NotifPanel({
                   <p className="text-xs text-gray-800 leading-relaxed">
                     {n.message}
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-1 font-mono">
+                  <p className="text-xs text-gray-400 mt-1 ">
                     {fmtDate(n.created_at)}
                   </p>
                 </div>

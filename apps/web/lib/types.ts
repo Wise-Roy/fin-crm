@@ -15,7 +15,8 @@ export type View =
   | "clients"
   | "team"
   | "reimbursements"
-  | "analytics";
+  | "analytics"
+  | "configuration";
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "WAITING_CLIENT" | "REVIEW" | "COMPLETED" | "CANCELLED";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

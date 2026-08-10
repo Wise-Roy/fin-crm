@@ -8,6 +8,7 @@ import teamRoutes from './modules/team/team.routes.js'
 import categoryRoutes from './modules/category/category.routes.js'
 import paymentRoutes from './modules/payment/payment.routes.js'
 import reimbursementRoutes from './modules/reimbursement/reimbursement.routes.js'
+import configRoutes from './modules/tenant/tenant-config.routes.js'
 import './types/auth'
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/team', teamRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reimbursements', reimbursementRoutes);
+app.use('/api/config', configRoutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT,()=>{

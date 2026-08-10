@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  Shield,
+  ListTodo,
   X,
   Eye,
   EyeOff,
@@ -125,7 +125,7 @@ export function AuthModal({
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-gray-900 rounded-lg flex items-center justify-center">
-                  <Shield size={16} className="text-white" />
+                  <ListTodo size={16} className="text-white" />
                 </div>
                 <span className="text-base font-bold text-gray-900">
                   FinCRM
@@ -252,7 +252,7 @@ export function AuthModal({
                   exit={{ opacity: 0, x: -12 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <p className="text-sm font-semibold text-gray-900 mb-1">
+                  <p className="text-base font-semibold text-gray-900 mb-1">
                     Get Started
                   </p>
                   <p className="text-xs text-gray-400 mb-5">
@@ -314,7 +314,7 @@ export function AuthModal({
                   onSubmit={handleCreateOrg}
                   className="space-y-5"
                 >
-                  <p className="text-md text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
+                  <p className="text-base text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
                     You will be granted{" "}
                     <strong className="text-gray-900">Owner</strong>{" "}
                     access — full control over your organisation.
@@ -415,7 +415,7 @@ export function AuthModal({
                   onSubmit={handleJoinOrg}
                   className="space-y-5"
                 >
-                  <p className="text-md text-gray-500 bg-blue-50 rounded-lg px-3 py-2.5">
+                  <p className="text-base text-gray-500 bg-blue-50 rounded-lg px-3 py-2.5">
                     Your request will be sent to the organisation owner for approval.
                   </p>
                   <div>

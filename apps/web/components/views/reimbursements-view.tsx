@@ -79,8 +79,8 @@ export function ReimbursementsView({
           },
         ].map((s) => (
           <div key={s.l} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wider mb-2">{s.l}</div>
-            <div className="text-xl font-mono font-semibold text-gray-900">{s.v}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{s.l}</div>
+            <div className="text-xl font-semibold text-gray-900">{s.v}</div>
             <div className="text-xs text-gray-400 mt-1">{s.sub}</div>
           </div>
         ))}
@@ -88,7 +88,7 @@ export function ReimbursementsView({
 
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-          <h3 className="text-sm font-semibold text-gray-900">Reimbursement Requests</h3>
+          <h3 className="typo-card-title text-gray-900">Reimbursement Requests</h3>
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors shadow-sm"
@@ -122,7 +122,7 @@ export function ReimbursementsView({
                   placeholder="Amount *"
                   value={formAmount}
                   onChange={(e) => setFormAmount(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-mono"
+                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-semibold"
                 />
                 <input
                   placeholder="Description (optional)"
@@ -135,7 +135,7 @@ export function ReimbursementsView({
                   <button
                     onClick={submitReimb}
                     disabled={!formTaskId || !formAmount}
-                    className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                    className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
                   >
                     Submit
                   </button>
@@ -150,7 +150,7 @@ export function ReimbursementsView({
             <thead>
               <tr className="border-b border-gray-50 bg-gray-50/40">
                 {["Amount", "Task", "Description", "Date", "Status", ""].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -164,7 +164,7 @@ export function ReimbursementsView({
                   className="hover:bg-gray-50/40 transition-colors group"
                 >
                   <td className="px-4 py-3">
-                    <span className="text-sm font-mono font-semibold text-gray-900">{fmtINR(Number(r.amount))}</span>
+                    <span className="text-sm  font-semibold text-gray-900">{fmtINR(Number(r.amount))}</span>
                   </td>
                   <td className="px-4 py-3 max-w-[150px]">
                     <span className="text-xs text-gray-500 truncate block">{r.task?.title || "\u2014"}</span>
@@ -173,7 +173,7 @@ export function ReimbursementsView({
                     <span className="text-xs text-gray-500 truncate block">{r.description || "\u2014"}</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-[11px] font-mono text-gray-400">{fmtDate(r.created_at)}</span>
+                    <span className="text-xs text-gray-400">{fmtDate(r.created_at)}</span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded font-medium ${REIMB_CLS[r.status]}`}>
@@ -183,8 +183,8 @@ export function ReimbursementsView({
                   <td className="px-4 py-3">
                     {r.status === "PENDING" && can(userRole, "approve_reimb") && (
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => onAction(r.id, "APPROVED")} className="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-100 transition-colors font-medium">Approve</button>
-                        <button onClick={() => onAction(r.id, "REJECTED")} className="text-[11px] bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 transition-colors font-medium">Reject</button>
+                        <button onClick={() => onAction(r.id, "APPROVED")} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-100 transition-colors font-medium">Approve</button>
+                        <button onClick={() => onAction(r.id, "REJECTED")} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 transition-colors font-medium">Reject</button>
                       </div>
                     )}
                   </td>

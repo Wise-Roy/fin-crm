@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Plus, Lock, X, IndianRupee, History, Trash2 } from "lucide-react";
+import { Plus, Lock, X, IndianRupee, History, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Task, TaskStatus, TaskPayment, TaskHistory, Role } from "@/lib/types";
-import { STATUS_CFG, STATUS_NEXT, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials } from "@/lib/utils";
+import { STATUS_CFG, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials } from "@/lib/utils";
 import { StatusBadge, PriorityDot, Av } from "@/components/ui-atoms";
 import { api } from "@/lib/api";
 
@@ -28,7 +28,6 @@ export function TasksView({
   userRole: Role;
 }) {
   const [filter, setFilter] = useState<"all" | TaskStatus>("all");
-  const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskHistory, setTaskHistory] = useState<TaskHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -40,19 +39,8 @@ export function TasksView({
 
   const filtered = useMemo(
     () =>
-      tasks.filter(
-        (t) =>
-          (filter === "all" || t.status === filter) &&
-          (!search ||
-            [
-              t.title,
-              t.client?.name || "",
-              t.users_task_assigned_to_employee_idTousers?.name || "",
-            ].some((f) =>
-              f.toLowerCase().includes(search.toLowerCase())
-            ))
-      ),
-    [tasks, filter, search]
+      tasks.filter((t) => filter === "all" || t.status === filter),
+    [tasks, filter]
   );
 
   const tabs: Array<{ key: "all" | TaskStatus; label: string; count: number }> = [
@@ -100,39 +88,19 @@ export function TasksView({
           </div>
         )}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-lg p-1 shadow-sm">
+          <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setFilter(tab.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filter === tab.key ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
+                className={`px-3 py-1.5 text-md font-medium rounded-md transition-all ${filter === tab.key ? "bg-gray-900 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"}`}
               >
                 {tab.label}
-                <span className={`ml-1.5 font-mono text-[10px] ${filter === tab.key ? "opacity-60" : "opacity-40"}`}>
+                <span className={`ml-1.5 text-xs ${filter === tab.key ? "opacity-60" : "opacity-40"}`}>
                   {tab.count}
                 </span>
               </button>
             ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 w-44"
-              />
-            </div>
-            {can(userRole, "add_task") && (
-              <button
-                onClick={onAddTask}
-                className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-800 transition-all shadow-sm"
-              >
-                <Plus size={12} /> New Task
-              </button>
-            )}
           </div>
         </div>
 
@@ -141,8 +109,8 @@ export function TasksView({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-50 bg-gray-50/40">
-                  {["Task", "Client", "Assignee", "Status", "Priority", "Due", "Payment", ""].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  {["Task", "Client", "Assignee", "Status", "Priority", "Due", "Payment", "Action"].map((h) => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
                   ))}
@@ -166,7 +134,7 @@ export function TasksView({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 max-w-[200px]">
                           {task.categories && (
-                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono shrink-0">
+                            <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">
                               {task.categories.name}
                             </span>
                           )}
@@ -188,7 +156,7 @@ export function TasksView({
                       <td className="px-4 py-3"><PriorityDot priority={task.priority} /></td>
                       <td className="px-4 py-3">
                         {task.due_date ? (
-                          <span className={`text-xs font-mono ${isOverdue(task.due_date, task.status) ? "text-red-500 font-semibold" : "text-gray-400"}`}>
+                          <span className={`text-xs ${isOverdue(task.due_date, task.status) ? "text-red-500 font-semibold" : "text-gray-400"}`}>
                             {fmtDate(task.due_date)}
                           </span>
                         ) : (
@@ -197,7 +165,7 @@ export function TasksView({
                       </td>
                       <td className="px-4 py-3">
                         {totalPay > 0 ? (
-                          <span className="text-xs font-mono text-gray-600">
+                          <span className="text-xs text-gray-600">
                             {fmtINR(paidPay)}<span className="text-gray-300">/{fmtINR(totalPay)}</span>
                           </span>
                         ) : (
@@ -205,14 +173,17 @@ export function TasksView({
                         )}
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        {STATUS_NEXT[task.status] && (
-                          <button
-                            onClick={() => onStatusChange(task.id, STATUS_NEXT[task.status]!)}
-                            className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors opacity-0 group-hover:opacity-100 whitespace-nowrap font-medium"
-                          >
-                            {"\u2192"} {STATUS_CFG[STATUS_NEXT[task.status]!].label}
-                          </button>
-                        )}
+                        <select
+                          value={task.status}
+                          onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
+                          className="text-xs bg-white text-black rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gray-900/20 appearance-none border border-gray-400 hover:border-black transition-colors"
+                        >
+                          {(Object.keys(STATUS_CFG) as TaskStatus[]).map((s) => (
+                            <option key={s} value={s} className="bg-gray-900 text-white">
+                              {STATUS_CFG[s].label}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                     </motion.tr>
                   );
@@ -238,7 +209,7 @@ export function TasksView({
           >
             <div className="flex items-start justify-between px-5 py-4 border-b border-gray-50 shrink-0">
               <div className="min-w-0 pr-4">
-                <h3 className="text-sm font-semibold text-gray-900 truncate">{selectedTask.title}</h3>
+                <h3 className="text-base font-semibold text-gray-900 truncate">{selectedTask.title}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <StatusBadge status={selectedTask.status} />
                   <PriorityDot priority={selectedTask.priority} />
@@ -259,7 +230,7 @@ export function TasksView({
                   ["Created", fmtDate(selectedTask.created_at)],
                 ] as const).map(([l, v]) => (
                   <div key={l}>
-                    <div className="text-[11px] text-gray-400 uppercase tracking-wider mb-0.5">{l}</div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">{l}</div>
                     <div className="text-xs font-medium text-gray-800 truncate">{v}</div>
                   </div>
                 ))}
@@ -268,11 +239,11 @@ export function TasksView({
               {/* Payments Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
                     <IndianRupee size={10} /> Payments ({taskPayments.length})
                   </h4>
                   {can(userRole, "manage_payments") && (
-                    <button onClick={() => setShowPayForm(!showPayForm)} className="text-[11px] text-gray-500 hover:text-gray-900 flex items-center gap-1">
+                    <button onClick={() => setShowPayForm(!showPayForm)} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
                       <Plus size={10} /> Add
                     </button>
                   )}
@@ -283,10 +254,10 @@ export function TasksView({
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mb-3">
                       <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <input placeholder="Payment type (e.g. Service Fee)" value={payType} onChange={(e) => setPayType(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                        <input type="number" placeholder="Amount" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-mono" />
+                        <input type="number" placeholder="Amount" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-medium" />
                         <div className="flex gap-2">
                           <button onClick={() => setShowPayForm(false)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100">Cancel</button>
-                          <button onClick={submitPayment} className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 flex-1">Add Payment</button>
+                          <button onClick={submitPayment} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 flex-1">Add Payment</button>
                         </div>
                       </div>
                     </motion.div>
@@ -301,14 +272,14 @@ export function TasksView({
                       <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 group/pay">
                         <div>
                           <div className="text-xs font-medium text-gray-700">{p.payment_type}</div>
-                          <div className="text-[11px] font-mono text-gray-500">{fmtINR(Number(p.amount))}</div>
+                          <div className="text-xs text-gray-500">{fmtINR(Number(p.amount))}</div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${PAYMENT_CLS[p.payment_status]}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${PAYMENT_CLS[p.payment_status]}`}>
                             {p.payment_status === "SUCCESS" ? "Paid" : p.payment_status.charAt(0) + p.payment_status.slice(1).toLowerCase()}
                           </span>
                           {p.payment_status === "PENDING" && can(userRole, "mark_payment_done") && selectedTask.status === "COMPLETED" && (
-                            <button onClick={() => onMarkPaymentPaid(p.id)} className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100 font-medium opacity-0 group-hover/pay:opacity-100 transition-opacity">
+                            <button onClick={() => onMarkPaymentPaid(p.id)} className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100 font-medium opacity-0 group-hover/pay:opacity-100 transition-opacity">
                               Mark Paid
                             </button>
                           )}
@@ -323,13 +294,13 @@ export function TasksView({
                   )}
                 </div>
                 {selectedTask.status !== "COMPLETED" && taskPayments.some((p) => p.payment_status === "PENDING") && (
-                  <p className="text-[10px] text-amber-600 mt-2">Task must be completed before payments can be marked as paid.</p>
+                  <p className="text-xs text-amber-600 mt-2">Task must be completed before payments can be marked as paid.</p>
                 )}
               </div>
 
               {/* History Section */}
               <div>
-                <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-3">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-3">
                   <History size={10} /> History
                 </h4>
                 {historyLoading ? (
@@ -345,11 +316,11 @@ export function TasksView({
                           <div className="text-xs text-gray-600">
                             <span className="font-medium">{h.users?.name || "System"}</span>
                             {" changed status "}
-                            <span className="font-mono text-[10px]">{(h.old_value as any)?.status}</span>
+                            <span className=" text-xs">{(h.old_value as any)?.status}</span>
                             {" \u2192 "}
-                            <span className="font-mono text-[10px]">{(h.new_value as any)?.status}</span>
+                            <span className="font-medium text-xs">{(h.new_value as any)?.status}</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 font-mono">{fmtDate(h.created_at)}</div>
+                          <div className="text-xs text-gray-400">{fmtDate(h.created_at)}</div>
                         </div>
                       </div>
                     ))}

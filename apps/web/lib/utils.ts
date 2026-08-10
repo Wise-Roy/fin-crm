@@ -75,7 +75,7 @@ export const REIMB_CLS: Record<ReimbStatus, string> = {
 const ALL_VIEWS: View[] = ["dashboard", "tasks", "clients", "team", "reimbursements", "analytics"];
 
 export const ROLE_VIEWS: Record<Role, View[]> = {
-  OWNER: ALL_VIEWS,
+  OWNER: [...ALL_VIEWS, "configuration"],
   ADMIN: ALL_VIEWS,
   MANAGER: ALL_VIEWS,
   EMPLOYEE: ALL_VIEWS,

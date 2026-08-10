@@ -37,7 +37,7 @@ export function RoleAssignModal({
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm pointer-events-auto border border-gray-100">
           <div className="px-6 pt-5 pb-4 border-b border-gray-50 flex items-start justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">
+              <h3 className="typo-card-title text-gray-900">
                 Assign Role &amp; Approve
               </h3>
               <p className="text-xs text-gray-400 mt-0.5">
@@ -53,7 +53,7 @@ export function RoleAssignModal({
           </div>
           <div className="px-6 py-5 space-y-4">
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center font-mono text-xs font-semibold">
+              <div className="w-9 h-9 bg-gray-900 text-white rounded-full flex items-center justify-center  text-xs font-semibold">
                 {member.name
                   .split(" ")
                   .map((n) => n[0])
@@ -64,13 +64,13 @@ export function RoleAssignModal({
                 <div className="text-sm font-semibold text-gray-900">
                   {member.name}
                 </div>
-                <div className="text-xs text-gray-400 font-mono">
+                <div className="text-xs text-gray-400 ">
                   {member.email}
                 </div>
               </div>
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-400 mb-2 uppercase tracking-wider">
+              <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">
                 Assign Role
               </label>
               <div className="space-y-2">

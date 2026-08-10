@@ -73,7 +73,7 @@ export function Combobox({
 
   return (
     <div ref={ref} className="relative">
-      <label className="block text-[11px] font-medium text-gray-400 mb-1 uppercase tracking-wider">
+      <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
         {label}
       </label>
       <button

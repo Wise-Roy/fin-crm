@@ -273,6 +273,15 @@ export const api = {
       }),
   },
 
+  config: {
+    get: () => request<{ config: Record<string, unknown> | null }>("/config"),
+    update: (theme: Record<string, unknown>) =>
+      request<{ config: Record<string, unknown> }>("/config", {
+        method: "PUT",
+        body: JSON.stringify({ theme }),
+      }),
+  },
+
   categories: {
     list: () => request<{ data: Category[] }>("/categories"),
 

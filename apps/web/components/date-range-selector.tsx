@@ -142,26 +142,26 @@ export function DateRangeSelector({
             </div>
           ) : (
             <div className="p-4 space-y-3">
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Custom Range
               </p>
               <div className="space-y-2">
                 <div>
-                  <label className="text-[11px] text-gray-400 block mb-1">From</label>
+                  <label className="text-xs text-gray-400 block mb-1">From</label>
                   <input
                     type="date"
                     value={customStart}
                     onChange={(e) => setCustomStart(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-mono"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 "
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-gray-400 block mb-1">To</label>
+                  <label className="text-xs text-gray-400 block mb-1">To</label>
                   <input
                     type="date"
                     value={customEnd}
                     onChange={(e) => setCustomEnd(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-mono"
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 "
                   />
                 </div>
               </div>

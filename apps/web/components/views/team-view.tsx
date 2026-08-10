@@ -38,7 +38,7 @@ export function TeamView({
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${tab === "members" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
         >
           Members
-          <span className="ml-1.5 text-xs text-gray-400 font-mono">{teamMembers.length}</span>
+          <span className="ml-1.5 text-xs text-gray-400">{teamMembers.length}</span>
         </button>
         {canManage && (
           <button
@@ -47,7 +47,7 @@ export function TeamView({
           >
             Requests
             {pendingCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-mono px-1.5 py-0.5 rounded-full">
+              <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                 {pendingCount}
               </span>
             )}
@@ -77,7 +77,7 @@ export function TeamView({
                 className="bg-white border border-gray-100 rounded-xl shadow-sm p-5 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start gap-3 mb-5">
-                  <div className="w-11 h-11 rounded-xl bg-gray-900 text-white flex items-center justify-center font-mono font-semibold text-sm shrink-0">
+                  <div className="w-11 h-11 rounded-xl bg-gray-900 text-white flex items-center justify-center font-semibold text-sm shrink-0">
                     {getInitials(member.name)}
                   </div>
                   <div>
@@ -85,7 +85,7 @@ export function TeamView({
                       {member.name}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{member.position || ROLE_LABELS[member.role]}</div>
-                    <div className="text-[11px] text-gray-400 font-mono mt-0.5">
+                    <div className="text-xs text-gray-400 mt-0.5">
                       {member.email}
                     </div>
                   </div>
@@ -101,16 +101,16 @@ export function TeamView({
                       className="text-center bg-gray-50 rounded-lg py-2.5"
                     >
                       <div
-                        className={`text-lg font-mono font-semibold ${s.a ? "text-red-500" : "text-gray-900"}`}
+                        className={`text-lg font-semibold ${s.a ? "text-red-500" : "text-gray-900"}`}
                       >
                         {s.v}
                       </div>
-                      <div className="text-[11px] text-gray-400">{s.l}</div>
+                      <div className="text-xs text-gray-400">{s.l}</div>
                     </div>
                   ))}
                 </div>
                 <div>
-                  <div className="text-[11px] text-gray-400 uppercase tracking-wider mb-2">
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">
                     Active Tasks
                   </div>
                   {active.length === 0 ? (
@@ -155,13 +155,13 @@ export function TeamView({
               transition={{ delay: i * 0.04 }}
               className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4"
             >
-              <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center font-mono font-semibold text-sm shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center font-semibold text-sm shrink-0">
                 {getInitials(req.name)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-gray-900">{req.name}</div>
-                <div className="text-xs text-gray-400 font-mono">{req.email}</div>
-                <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                <div className="text-xs text-gray-400">{req.email}</div>
+                <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                   <Clock size={10} />
                   {new Date(req.created_at).toLocaleDateString("en-IN", {
                     day: "2-digit",
