@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { ListTodo, AlertCircle, TrendingUp, Receipt, Plus, ArrowRight, Clock } from "lucide-react";
+import { ListTodo, AlertCircle, TrendingUp, Receipt, Plus, Clock } from "lucide-react";
 import { motion } from "motion/react";
-import type { Task, Client, TeamMember, Reimbursement, PendingMember, Role } from "@/lib/types";
+import type { Task, Client, TeamMember, Reimbursement, Role } from "@/lib/types";
 import { PRIORITY_DOT, can, fmtINR, fmtDate, isOverdue, getInitials } from "@/lib/utils";
 import { StatusBadge, Av } from "@/components/ui-atoms";
 
@@ -20,8 +20,6 @@ export function DashboardView({
   teamMembers,
   reimbursements,
   onAddTask,
-  pendingMembers,
-  onOpenApproval,
   userRole,
   userName,
 }: {
@@ -30,8 +28,6 @@ export function DashboardView({
   teamMembers: TeamMember[];
   reimbursements: Reimbursement[];
   onAddTask: () => void;
-  pendingMembers: PendingMember[];
-  onOpenApproval: (m: PendingMember) => void;
   userRole: Role;
   userName: string;
 }) {
@@ -78,25 +74,6 @@ export function DashboardView({
         </motion.h1>
       </div>
 
-      {/* Pending approvals */}
-      {(userRole === "OWNER" || userRole === "ADMIN") && pendingMembers.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-50/80 border border-amber-200/60 rounded-xl px-4 py-3 flex items-center gap-3"
-        >
-          <AlertCircle size={16} className="text-amber-600 shrink-0" />
-          <span className="text-sm text-amber-900 flex-1">
-            <strong>{pendingMembers.length}</strong> member{pendingMembers.length > 1 ? "s" : ""} awaiting approval
-          </span>
-          <button
-            onClick={() => onOpenApproval(pendingMembers[0]!)}
-            className="text-xs font-medium text-amber-700 hover:text-amber-900 flex items-center gap-1 transition-colors"
-          >
-            Review <ArrowRight size={12} />
-          </button>
-        </motion.div>
-      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

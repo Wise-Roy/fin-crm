@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   LayoutDashboard,
   Building2,
   Users,
   Receipt,
+  Signature,
   BarChart3,
   Bell,
   Plus,
@@ -23,12 +24,13 @@ import { api, ApiError } from "@/lib/api";
 import { can } from "@/lib/utils";
 import { NotifPanel } from "@/components/notification-panel";
 import { QuickAddModal } from "@/components/quick-add-modal";
-import { DateRangeSelector, getTodayRange } from "@/components/date-range-selector";
+import { DateRangeSelector, getLast30DaysRange } from "@/components/date-range-selector";
 import type { DateRange } from "@/components/date-range-selector";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { TasksView } from "@/components/views/tasks-view";
 import { ClientsView } from "@/components/views/clients-view";
 import { TeamView } from "@/components/views/team-view";
+import { DscView } from "@/components/dsc/dsc-view";
 import { ReimbursementsView } from "@/components/views/reimbursements-view";
 import { AnalyticsView } from "@/components/views/analytics-view";
 import { ConfigurationView } from "@/components/views/configuration-view";
@@ -38,9 +40,9 @@ import type {
   Task,
   Client,
   TeamMember,
-  JoinRequest,
   Category,
   Reimbursement,
+  Dsc,
   TaskPayment,
   Notification as NotifType,
   TaskStatus,
@@ -53,6 +55,7 @@ const PAGE_TITLE: Record<View, string> = {
   tasks: "Tasks",
   clients: "Clients",
   team: "Team",
+  dsc: "DSC",
   reimbursements: "Reimbursements",
   analytics: "Analytics",
   configuration: "Configuration",
@@ -63,6 +66,7 @@ const NAV_ITEMS: Array<{ id: View; label: string; icon: React.ElementType }> = [
   { id: "tasks", label: "Tasks", icon: ListTodo },
   { id: "clients", label: "Clients", icon: Building2 },
   { id: "team", label: "Team", icon: Users },
+  { id: "dsc", label: "DSC", icon: Signature },
   { id: "reimbursements", label: "Reimb.", icon: Receipt },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
 ];
@@ -76,39 +80,29 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
 
+  const [dscEntries, setDscEntries] = useState<Dsc[]>([]);
   const [reimbs, setReimbs] = useState<Reimbursement[]>([]);
   const [payments, setPayments] = useState<TaskPayment[]>([]);
   const [notifs, setNotifs] = useState<NotifType[]>(INIT_NOTIFS);
 
-  const [dateRange, setDateRange] = useState<DateRange>(getTodayRange);
+  const [dateRange, setDateRange] = useState<DateRange>(getLast30DaysRange);
 
   const [showAddTask, setShowAddTask] = useState(false);
+  const [showAddDsc, setShowAddDsc] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
 
   const userRole = appUser?.role || "EMPLOYEE";
   const userInitials = appUser?.initials || getInitials(appUser?.name || "??");
 
-  const pendingRequestCount = joinRequests.filter((r) => r.status === "PENDING").length;
-  const unread = notifs.filter((n) => !n.is_read).length + pendingRequestCount;
+  const unread = notifs.filter((n) => !n.is_read).length;
   const activeTaskCount = tasks.filter((t) => t.status !== "COMPLETED" && t.status !== "CANCELLED").length;
   const pendingReimbCount = reimbs.filter((r) => r.status === "PENDING").length;
-
-  const joinRequestNotifs: NotifType[] = joinRequests
-    .filter((r) => r.status === "PENDING")
-    .map((r) => ({
-      id: `jr-${r.id}`,
-      title: "Join Request",
-      message: `${r.name} (${r.email}) wants to join your organisation.`,
-      is_read: false,
-      created_at: r.created_at,
-    }));
-  const allNotifs = [...joinRequestNotifs, ...notifs].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
 
   const getDateParams = useCallback((): Record<string, string> => {
     const y = (d: Date) => d.getFullYear();
@@ -118,8 +112,9 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     return { startDate: fmt(dateRange.startDate), endDate: fmt(dateRange.endDate) };
   }, [dateRange]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isInitial = false) => {
+    if (isInitial) setLoading(true);
+    setDataLoading(true);
     try {
       const isAdmin = can(userRole, "see_all");
       const dp = getDateParams();
@@ -129,25 +124,38 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
         api.team.list({ limit: "100" }),
         api.categories.list(),
         api.reimbursements.list({ limit: "100" }),
+        api.dsc.list({ limit: "100" }),
         api.payments.list({ limit: "100" }),
       ];
-      if (can(userRole, "view_requests")) fetches.push(api.joinRequests.list());
       const results = await Promise.all(fetches);
       setTasks((results[0] as { data: Task[] }).data);
       setClients((results[1] as { data: Client[] }).data);
       setTeamMembers((results[2] as { data: TeamMember[] }).data);
       setCategories((results[3] as { data: Category[] }).data);
       setReimbs((results[4] as { data: Reimbursement[] }).data);
-      setPayments((results[5] as { data: TaskPayment[] }).data);
-      if (results[6]) setJoinRequests((results[6] as { data: JoinRequest[] }).data);
+      setDscEntries((results[5] as { data: Dsc[] }).data);
+      setPayments((results[6] as { data: TaskPayment[] }).data);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
+      setDataLoading(false);
     }
   }, [userRole, getDateParams]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const initialRef = useRef(true);
+  useEffect(() => {
+    fetchData(initialRef.current);
+    initialRef.current = false;
+  }, [fetchData]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setShowAddMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const handleTaskStatusChange = useCallback(async (id: string, status: TaskStatus) => {
     try {
@@ -170,25 +178,11 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
-  const handleApproveRequest = useCallback(async (id: string, role: Role) => {
-    try {
-      await api.joinRequests.approve(id, role);
-      setJoinRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "APPROVED" as const, assigned_role: role } : r)));
-      api.team.list({ limit: "100" }).then((res) => setTeamMembers(res.data)).catch(() => {});
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to approve request";
-      alert(msg);
-    }
-  }, []);
-
-  const handleRejectRequest = useCallback(async (id: string) => {
-    try {
-      await api.joinRequests.reject(id);
-      setJoinRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "REJECTED" as const } : r)));
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to reject request";
-      alert(msg);
-    }
+  const handleAddMember = useCallback(async (data: {
+    name: string; email: string; password: string; role: string; position?: string; phone?: string;
+  }) => {
+    const { member } = await api.team.create(data);
+    setTeamMembers((prev) => [member, ...prev]);
   }, []);
 
   const handleAddClient = useCallback(async (data: { name: string; email?: string; phone?: string }) => {
@@ -197,6 +191,26 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       setClients((prev) => [client, ...prev]);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to create client";
+      alert(msg);
+    }
+  }, []);
+
+  const handleAddDsc = useCallback(async (data: {
+    pan_number: string; name: string; related_company: string;
+    issue_date: string; valid_till_date: string; issuing_authority: string;
+    password: string; client_id?: string; client_group_id?: string;
+    position?: string; mobile_number?: string;
+  }) => {
+    const { dsc } = await api.dsc.create(data);
+    setDscEntries((prev) => [dsc, ...prev]);
+  }, []);
+
+  const handleDeleteDsc = useCallback(async (id: string) => {
+    try {
+      await api.dsc.delete(id);
+      setDscEntries((prev) => prev.filter((d) => d.id !== id));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to delete DSC";
       alert(msg);
     }
   }, []);
@@ -320,9 +334,13 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       >
         {/* Logo */}
         <div className="flex items-center justify-center py-5" style={{ borderBottom: `1px solid ${sidebarFg}10` }}>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: sidebarFg }}>
-            <ListTodo size={15} style={{ color: sidebarBg }} />
-          </div>
+          {theme.logoUrl ? (
+            <img src={theme.logoUrl} alt="Logo" className="w-12 h-12 rounded-lg object-contain" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: sidebarFg }}>
+              <ListTodo size={15} style={{ color: sidebarBg }} />
+            </div>
+          )}
           {sidebarExpanded && (
             <motion.span
               initial={{ opacity: 0 }}
@@ -341,7 +359,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
             const badge =
               item.id === "tasks" ? activeTaskCount
               : item.id === "reimbursements" ? pendingReimbCount
-              : item.id === "team" ? pendingRequestCount
+              : item.id === "team" ? 0
               : 0;
             const active = view === item.id;
             return (
@@ -445,16 +463,18 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
         >
           {/* Left: search + date */}
           <div className="hidden md:flex items-center gap-2 max-w-lg flex-1 mx-8">
-            <div className="relative w-full max-w-xs">
-              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full pl-9 pr-10 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-all"
-                style={{ borderColor: `${navbarFg}12`, backgroundColor: `${navbarFg}04`, color: navbarFg }}
-                readOnly
-              />
-            </div>
+            {view !== "dsc" && (
+              <div className="relative w-full max-w-xs">
+                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full pl-9 pr-10 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-all"
+                  style={{ borderColor: `${navbarFg}12`, backgroundColor: `${navbarFg}04`, color: navbarFg }}
+                  readOnly
+                />
+              </div>
+            )}
             <DateRangeSelector value={dateRange} onChange={setDateRange} />
           </div>
 
@@ -478,26 +498,70 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
               <NotifPanel
                 open={showNotifs}
                 onClose={() => setShowNotifs(false)}
-                notifications={allNotifs}
+                notifications={notifs}
                 onMarkAll={() => setNotifs((p) => p.map((n) => ({ ...n, is_read: true })))}
-                onViewRequests={pendingRequestCount > 0 ? () => { setView("team"); setShowNotifs(false); } : undefined}
               />
             </div>
-            {can(userRole, "add_task") && (view === "dashboard" || view === "tasks" || view === "clients") && (
+            {/* Add dropdown */}
+            <div className="relative" ref={addMenuRef}>
               <button
-                onClick={() => setShowAddTask(true)}
+                onClick={() => setShowAddMenu((p) => !p)}
                 className="flex items-center gap-1.5 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
                 style={{ backgroundColor: accentColor }}
               >
                 <Plus size={14} />
-                <span className="hidden sm:inline">New Task</span>
+                <span className="hidden sm:inline">Add</span>
               </button>
-            )}
+              {showAddMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-gray-100 shadow-lg py-1 z-30">
+                  {can(userRole, "add_task") && (
+                    <button
+                      onClick={() => { setShowAddTask(true); setShowAddMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <ListTodo size={15} className="text-gray-400" />
+                      Add Task
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setView("clients"); setShowAddMenu(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Building2 size={15} className="text-gray-400" />
+                    Add Client
+                  </button>
+                  {can(userRole, "add_client") && (
+                    <button
+                      onClick={() => { setView("dsc"); setShowAddDsc(true); setShowAddMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Signature size={15} className="text-gray-400" />
+                      Add DSC
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setView("reimbursements"); setShowAddMenu(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Receipt size={15} className="text-gray-400" />
+                    Reimbursement
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
         {/* ─── Content ─── */}
-        <main className="flex-1 overflow-auto p-5">
+        <main className="flex-1 overflow-auto p-5 relative">
+          {dataLoading && (
+            <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+              <div className="flex items-center gap-3 text-gray-500">
+                <Loader2 size={20} className="animate-spin" />
+                <span className="text-sm font-medium">Loading...</span>
+              </div>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={view}
@@ -514,10 +578,6 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   teamMembers={teamMembers}
                   reimbursements={reimbs}
                   onAddTask={() => setShowAddTask(true)}
-                  pendingMembers={joinRequests.filter((r) => r.status === "PENDING").map((r) => ({
-                    id: r.id, name: r.name, email: r.email, status: "pending" as const, createdAt: r.created_at,
-                  }))}
-                  onOpenApproval={() => setView("team")}
                   userRole={userRole}
                   userName={appUser?.name || ""}
                 />
@@ -533,8 +593,20 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   onUpdateGroup={handleUpdateGroup} onDeleteGroup={handleDeleteGroup} userRole={userRole} />
               )}
               {view === "team" && (
-                <TeamView teamMembers={teamMembers} tasks={tasks} joinRequests={joinRequests}
-                  onApprove={handleApproveRequest} onReject={handleRejectRequest} userRole={userRole} />
+                <TeamView teamMembers={teamMembers} tasks={tasks}
+                  onAddMember={handleAddMember} userRole={userRole} />
+              )}
+              {view === "dsc" && (
+                <DscView
+                  entries={dscEntries}
+                  clients={clients}
+                  onAdd={handleAddDsc}
+                  onDelete={handleDeleteDsc}
+                  userRole={userRole}
+                  dateRange={dateRange}
+                  externalShowAdd={showAddDsc}
+                  onExternalShowAddChange={setShowAddDsc}
+                />
               )}
               {view === "reimbursements" && (
                 <ReimbursementsView reimbursements={reimbs} tasks={tasks} onAction={handleReimbAction}

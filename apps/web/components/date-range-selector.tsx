@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Calendar } from "lucide-react";
 
-export type DateRangePreset = "today" | "last_7_days" | "custom";
+export type DateRangePreset = "today" | "last_7_days" | "last_30_days" | "custom";
 
 export interface DateRange {
   preset: DateRangePreset;
@@ -35,6 +35,13 @@ export function getLast7DaysRange(): DateRange {
   return { preset: "last_7_days", startDate: startOfDay(start), endDate: endOfDay(now) };
 }
 
+export function getLast30DaysRange(): DateRange {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - 29);
+  return { preset: "last_30_days", startDate: startOfDay(start), endDate: endOfDay(now) };
+}
+
 function fmtShort(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
@@ -52,6 +59,8 @@ function getLabel(range: DateRange): string {
       return "Today";
     case "last_7_days":
       return "Last 7 Days";
+    case "last_30_days":
+      return "Last 30 Days";
     case "custom":
       return `${fmtShort(range.startDate)} – ${fmtShort(range.endDate)}`;
   }
@@ -81,8 +90,9 @@ export function DateRangeSelector({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const select = (preset: "today" | "last_7_days") => {
-    onChange(preset === "today" ? getTodayRange() : getLast7DaysRange());
+  const select = (preset: "today" | "last_7_days" | "last_30_days") => {
+    const ranges = { today: getTodayRange, last_7_days: getLast7DaysRange, last_30_days: getLast30DaysRange };
+    onChange(ranges[preset]());
     setOpen(false);
     setShowCustom(false);
   };
@@ -112,17 +122,21 @@ export function DateRangeSelector({
         <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg min-w-[220px] overflow-hidden">
           {!showCustom ? (
             <div className="py-1">
-              {(["today", "last_7_days"] as const).map((preset) => (
+              {([
+                { key: "today", label: "Today" },
+                { key: "last_7_days", label: "Last 7 Days" },
+                { key: "last_30_days", label: "Last 30 Days" },
+              ] as const).map((item) => (
                 <button
-                  key={preset}
-                  onClick={() => select(preset)}
+                  key={item.key}
+                  onClick={() => select(item.key)}
                   className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${
-                    value.preset === preset
+                    value.preset === item.key
                       ? "bg-gray-50 text-gray-900"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                   }`}
                 >
-                  {preset === "today" ? "Today" : "Last 7 Days"}
+                  {item.label}
                 </button>
               ))}
               <button

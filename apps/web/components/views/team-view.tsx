@@ -1,62 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "motion/react";
-import { UserCheck, UserX, Clock } from "lucide-react";
-import type { Task, TeamMember, JoinRequest, Role } from "@/lib/types";
-import { STATUS_CFG, isOverdue, getInitials, ROLE_LABELS, can } from "@/lib/utils";
-import { RoleAssignModal } from "@/components/role-assign-modal";
+import { motion, AnimatePresence } from "motion/react";
+import { Plus, X, Eye, EyeOff, Loader2 } from "lucide-react";
+import type { Task, TeamMember, Role } from "@/lib/types";
+import { STATUS_CFG, isOverdue, getInitials, ROLE_LABELS } from "@/lib/utils";
 
-type Tab = "members" | "requests";
+const ASSIGNABLE_ROLES: Array<{ value: Role; label: string }> = [
+  { value: "ADMIN", label: "Admin" },
+  { value: "MANAGER", label: "Manager" },
+  { value: "EMPLOYEE", label: "Employee" },
+];
 
 export function TeamView({
   teamMembers,
   tasks,
-  joinRequests,
-  onApprove,
-  onReject,
+  onAddMember,
   userRole,
 }: {
   teamMembers: TeamMember[];
   tasks: Task[];
-  joinRequests: JoinRequest[];
-  onApprove: (id: string, role: Role) => void;
-  onReject: (id: string) => void;
+  onAddMember: (data: {
+    name: string; email: string; password: string; role: string; position?: string; phone?: string;
+  }) => Promise<void>;
   userRole: Role;
 }) {
-  const [tab, setTab] = useState<Tab>("members");
-  const [selectedRequest, setSelectedRequest] = useState<JoinRequest | null>(null);
-  const canManage = can(userRole, "view_requests");
-  const pendingCount = joinRequests.filter((r) => r.status === "PENDING").length;
+  const [showAddMember, setShowAddMember] = useState(false);
 
   return (
     <div>
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit mb-5">
-        <button
-          onClick={() => setTab("members")}
-          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${tab === "members" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
-        >
-          Members
-          <span className="ml-1.5 text-xs text-gray-400">{teamMembers.length}</span>
-        </button>
-        {canManage && (
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Team Members</h2>
+          <p className="text-xs text-gray-400">{teamMembers.length} members</p>
+        </div>
+        {userRole === "OWNER" && (
           <button
-            onClick={() => setTab("requests")}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${tab === "requests" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+            onClick={() => setShowAddMember(true)}
+            className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
           >
-            Requests
-            {pendingCount > 0 && (
-              <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                {pendingCount}
-              </span>
-            )}
+            <Plus size={14} /> Add Member
           </button>
         )}
       </div>
 
-      {/* Members Tab */}
-      {tab === "members" && (
+      {/* Members */}
+      {(
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {teamMembers.length === 0 && (
             <div className="col-span-full text-center py-14 text-sm text-gray-400">
@@ -139,87 +129,182 @@ export function TeamView({
         </div>
       )}
 
-      {/* Requests Tab */}
-      {tab === "requests" && canManage && (
-        <div className="space-y-3">
-          {joinRequests.length === 0 && (
-            <div className="text-center py-14 text-sm text-gray-400">
-              No join requests.
+      {/* Add Member Modal */}
+      <AnimatePresence>
+        {showAddMember && (
+          <AddMemberModal
+            onAdd={async (data) => {
+              await onAddMember(data);
+              setShowAddMember(false);
+            }}
+            onClose={() => setShowAddMember(false)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function AddMemberModal({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (data: {
+    name: string; email: string; password: string; role: string; position?: string; phone?: string;
+  }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<Role>("EMPLOYEE");
+  const [position, setPosition] = useState("");
+  const [phone, setPhone] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      await onAdd({
+        name,
+        email,
+        password,
+        role,
+        position: position || undefined,
+        phone: phone || undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add member");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputCls =
+    "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-all";
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+      >
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 className="text-base font-semibold text-gray-900">Add Team Member</h3>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
+              <X size={16} className="text-gray-400" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+              Create login credentials for the new member. They can sign in immediately with these credentials.
+            </p>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Full Name</label>
+              <input type="text" required value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="John Doe" className={inputCls} />
             </div>
-          )}
-          {joinRequests.map((req, i) => (
-            <motion.div
-              key={req.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-              className="bg-white border border-gray-100 rounded-xl shadow-sm p-4 flex items-center gap-4"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center font-semibold text-sm shrink-0">
-                {getInitials(req.name)}
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="john@yourfirm.in" className={inputCls} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Password</label>
+              <div className="relative">
+                <input
+                  type={showPw ? "text" : "password"}
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                  className={`${inputCls} pr-10`}
+                />
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-gray-900">{req.name}</div>
-                <div className="text-xs text-gray-400">{req.email}</div>
-                <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                  <Clock size={10} />
-                  {new Date(req.created_at).toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </div>
-              </div>
-              <div className="shrink-0">
-                {req.status === "PENDING" ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedRequest(req)}
-                      className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-800 transition-colors"
-                    >
-                      <UserCheck size={12} /> Review
-                    </button>
-                  </div>
-                ) : (
-                  <span
-                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      req.status === "APPROVED"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-red-50 text-red-600"
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
+              <div className="flex gap-2">
+                {ASSIGNABLE_ROLES.map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => setRole(r.value)}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-all ${
+                      role === r.value
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-200 text-gray-500 hover:border-gray-300"
                     }`}
                   >
-                    {req.status === "APPROVED"
-                      ? `Approved — ${ROLE_LABELS[req.assigned_role!]}`
-                      : "Rejected"}
-                  </span>
-                )}
+                    {r.label}
+                  </button>
+                ))}
               </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
+            </div>
 
-      {/* Role Assign Modal */}
-      {selectedRequest && (
-        <RoleAssignModal
-          member={{
-            id: selectedRequest.id,
-            name: selectedRequest.name,
-            email: selectedRequest.email,
-            status: "pending",
-            createdAt: selectedRequest.created_at,
-          }}
-          onApprove={(id, role) => {
-            onApprove(id, role);
-            setSelectedRequest(null);
-          }}
-          onReject={(id) => {
-            onReject(id);
-            setSelectedRequest(null);
-          }}
-          onClose={() => setSelectedRequest(null)}
-        />
-      )}
-    </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Position <span className="text-gray-300">(optional)</span></label>
+                <input type="text" value={position} onChange={(e) => setPosition(e.target.value)}
+                  placeholder="e.g. CA" className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Phone <span className="text-gray-300">(optional)</span></label>
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)}
+                  placeholder="9876543210" className={inputCls} />
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gray-900 text-white py-3 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                "Add Member"
+              )}
+            </button>
+          </form>
+        </div>
+      </motion.div>
+    </>
   );
 }

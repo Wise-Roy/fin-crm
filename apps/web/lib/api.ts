@@ -1,4 +1,4 @@
-import type { Task, Client, ClientGroup, TeamMember, Reimbursement, Role, JoinRequest, Category, SubCategory, TaskPayment, TaskHistory, ClientRevenue } from "./types";
+import type { Task, Client, ClientGroup, TeamMember, Reimbursement, Role, Category, SubCategory, TaskPayment, TaskHistory, ClientRevenue, Dsc } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const TOKEN_KEY = "fincrm_token";
@@ -217,6 +217,33 @@ export const api = {
       }),
   },
 
+  dsc: {
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<PaginatedResponse<Dsc>>(`/dsc${qs}`);
+    },
+    getById: (id: string) => request<{ dsc: Dsc }>(`/dsc/${encodeURIComponent(id)}`),
+    create: (data: {
+      pan_number: string; name: string; related_company: string;
+      issue_date: string; valid_till_date: string; issuing_authority: string;
+      password: string; client_id?: string; client_group_id?: string;
+      position?: string; mobile_number?: string;
+    }) =>
+      request<{ dsc: Dsc }>("/dsc", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Record<string, unknown>) =>
+      request<{ dsc: Dsc }>(`/dsc/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ message: string }>(`/dsc/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }),
+  },
+
   reimbursements: {
     list: (params?: Record<string, string>) => {
       const qs = params ? "?" + new URLSearchParams(params).toString() : "";
@@ -242,36 +269,20 @@ export const api = {
       const qs = params ? "?" + new URLSearchParams(params).toString() : "";
       return request<PaginatedResponse<TeamMember>>(`/team${qs}`);
     },
-  },
-
-  joinRequests: {
     create: (data: {
-      organizationName: string;
       name: string;
       email: string;
       password: string;
+      role: string;
+      position?: string;
+      phone?: string;
     }) =>
-      request<{ joinRequest: { id: string; status: string } }>("/join-requests", {
+      request<{ member: TeamMember }>("/team", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-
-    list: (params?: Record<string, string>) => {
-      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-      return request<{ data: JoinRequest[] }>(`/join-requests${qs}`);
-    },
-
-    approve: (id: string, role: Role) =>
-      request<{ message: string }>(`/join-requests/${encodeURIComponent(id)}/approve`, {
-        method: "PATCH",
-        body: JSON.stringify({ role }),
-      }),
-
-    reject: (id: string) =>
-      request<{ message: string }>(`/join-requests/${encodeURIComponent(id)}/reject`, {
-        method: "PATCH",
-      }),
   },
+
 
   config: {
     get: () => request<{ config: Record<string, unknown> | null }>("/config"),
@@ -280,6 +291,13 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ theme }),
       }),
+    uploadLogo: (file: string, mimeType: string) =>
+      request<{ logoUrl: string }>("/config/logo", {
+        method: "POST",
+        body: JSON.stringify({ file, mimeType }),
+      }),
+    deleteLogo: () =>
+      request<{ success: boolean }>("/config/logo", { method: "DELETE" }),
   },
 
   categories: {

@@ -24,6 +24,7 @@ model User {
   task_task_created_byTousers              task[]          @relation("task_created_byTousers")
   task_history                             task_history[]
   join_requests_responded                  join_request[]  @relation("join_request_responder")
+  dsc                                      dsc[]
   tenant                                   tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([tenantId, email])
@@ -60,6 +61,7 @@ model client {
   tenant       tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   client_group client_group[]
   task         task[]
+  dsc          dsc[]
 
   @@unique([tenant_id, name], map: "client_name_unique_per_tenant")
   @@index([tenant_id], map: "idx_client_tenant")
@@ -79,6 +81,7 @@ model client_group {
   client     client   @relation(fields: [client_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   tenant     tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   task       task[]
+  dsc        dsc[]
 
   @@unique([client_id, group_name], map: "client_group_name_unique")
   @@index([client_id], map: "idx_client_group_client")
@@ -219,6 +222,33 @@ model task_reimbursement {
   @@index([task_id], map: "idx_task_reimbursement_task")
 }
 
+model dsc {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenant_id         String        @db.Uuid
+  pan_number        String        @db.VarChar(10)
+  name              String        @db.VarChar(255)
+  related_company   String        @db.VarChar(255)
+  issue_date        DateTime      @db.Date
+  valid_till_date   DateTime      @db.Date
+  issuing_authority String        @db.VarChar(255)
+  client_id         String?       @db.Uuid
+  client_group_id   String?       @db.Uuid
+  password          String        @db.VarChar(255)
+  position          String?       @db.VarChar(100)
+  mobile_number     String?       @db.VarChar(20)
+  created_by        String        @db.Uuid
+  created_at        DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime      @default(now()) @db.Timestamptz(6)
+  tenant            tenant        @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  client            client?       @relation(fields: [client_id], references: [id], onUpdate: NoAction)
+  client_group      client_group? @relation(fields: [client_group_id], references: [id], onUpdate: NoAction)
+  created_by_user   User          @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+
+  @@index([tenant_id], map: "idx_dsc_tenant")
+  @@index([tenant_id, client_id], map: "idx_dsc_client")
+  @@index([tenant_id, valid_till_date], map: "idx_dsc_valid_till")
+}
+
 model join_request {
   id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenant_id     String              @db.Uuid
@@ -253,6 +283,7 @@ model tenant {
   task_history       task_history[]
   task_payment       task_payment[]
   task_reimbursement task_reimbursement[]
+  dsc                dsc[]
   tenant_config      tenant_config[]
   users              User[]
 }

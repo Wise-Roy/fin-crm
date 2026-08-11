@@ -14,6 +14,7 @@ export type View =
   | "tasks"
   | "clients"
   | "team"
+  | "dsc"
   | "reimbursements"
   | "analytics"
   | "configuration";
@@ -22,7 +23,7 @@ export type TaskStatus = "TODO" | "IN_PROGRESS" | "WAITING_CLIENT" | "REVIEW" | 
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type ReimbStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
 
-export type AuthMode = "login" | "signup" | "create_org" | "join_org";
+export type AuthMode = "login" | "signup";
 
 export interface AuthUser {
   id: string;
@@ -188,6 +189,30 @@ export interface ClientRevenue {
   paid_count: number;
   total_pending: number;
   pending_count: number;
+}
+
+export type DscStatus = "ACTIVE" | "EXPIRING_SOON" | "EXPIRED";
+
+export interface Dsc {
+  id: string;
+  tenant_id: string;
+  pan_number: string;
+  name: string;
+  related_company: string;
+  issue_date: string;
+  valid_till_date: string;
+  issuing_authority: string;
+  client_id?: string | null;
+  client_group_id?: string | null;
+  password: string;
+  position?: string | null;
+  mobile_number?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  client?: { id: string; name: string } | null;
+  client_group?: { id: string; group_name: string } | null;
+  created_by_user?: { id: string; name: string } | null;
 }
 
 export interface Notification {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Palette, Type, Save, RotateCcw, Monitor, PanelLeft, Navigation, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Palette, Type, Save, RotateCcw, Monitor, PanelLeft, Navigation, Loader2, Upload, Trash2, Image } from "lucide-react";
 import { useTheme, type ThemeConfig } from "@/lib/theme-context";
+import { api } from "@/lib/api";
 
 const PRESET_PALETTES = [
   {
@@ -79,11 +80,71 @@ export function ConfigurationView() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [orgName, setOrgName] = useState(draft.orgDisplayName || "");
+  const [logoPreview, setLogoPreview] = useState<string | null>(draft.logoUrl || null);
+  const [logoFile, setLogoFile] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateColor = (key: keyof ThemeConfig["colors"], val: string) => {
     const next = { ...draft, colors: { ...draft.colors, [key]: val } };
     setDraft(next);
     setTheme(next); // live preview
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      alert("Allowed formats: PNG, JPG, SVG, WebP");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File too large. Max 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setLogoPreview(result);
+      setLogoFile({ base64: result, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoUpload = async () => {
+    if (!logoFile) return;
+    setUploadingLogo(true);
+    try {
+      const { logoUrl } = await api.config.uploadLogo(logoFile.base64, logoFile.mimeType);
+      setLogoPreview(logoUrl);
+      setLogoFile(null);
+      const updated = { ...draft, logoUrl };
+      setDraft(updated);
+      setTheme(updated);
+    } catch {
+      alert("Failed to upload logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    setUploadingLogo(true);
+    try {
+      await api.config.deleteLogo();
+      setLogoPreview(null);
+      setLogoFile(null);
+      const updated = { ...draft, logoUrl: undefined };
+      setDraft(updated);
+      setTheme(updated);
+    } catch {
+      alert("Failed to remove logo");
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSave = async () => {
@@ -143,6 +204,67 @@ export function ConfigurationView() {
             placeholder="e.g. Acme Corp"
             className="w-full max-w-sm text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
           />
+        </div>
+
+        {/* Logo Upload */}
+        <div className="p-4 bg-white rounded-xl border border-gray-100">
+          <label className="block text-sm font-medium text-gray-900 mb-1.5">
+            Organisation Logo
+          </label>
+          <p className="text-xs text-gray-400 mb-3">
+            Square image recommended. Renders at 32×32px in sidebar. Upload 128×128px to 256×256px for best quality. Max 2MB. PNG, JPG, SVG, or WebP.
+          </p>
+          <div className="flex items-center gap-4">
+            {/* Preview */}
+            <div className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
+              {logoPreview ? (
+                <img src={logoPreview} alt="Logo" className="w-full h-full object-contain" />
+              ) : (
+                <Image size={20} className="text-gray-300" />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                onChange={handleLogoSelect}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Upload size={12} />
+                  Choose File
+                </button>
+                {logoFile && (
+                  <button
+                    onClick={handleLogoUpload}
+                    disabled={uploadingLogo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors disabled:opacity-60"
+                  >
+                    {uploadingLogo ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                    Upload
+                  </button>
+                )}
+                {logoPreview && !logoFile && (
+                  <button
+                    onClick={handleLogoRemove}
+                    disabled={uploadingLogo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
+                  >
+                    {uploadingLogo ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    Remove
+                  </button>
+                )}
+              </div>
+              {logoFile && (
+                <p className="text-xs text-amber-600">File selected — click Upload to save.</p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
