@@ -9,6 +9,7 @@ import paymentRoutes from './modules/payment/payment.routes.js'
 import reimbursementRoutes from './modules/reimbursement/reimbursement.routes.js'
 import dscRoutes from './modules/dsc/dsc.routes.js'
 import configRoutes from './modules/tenant/tenant-config.routes.js'
+import notificationRoutes from './modules/notification/notification.routes.js'
 import './types/auth'
 
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reimbursements', reimbursementRoutes);
 app.use('/api/dsc', dscRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT,()=>{

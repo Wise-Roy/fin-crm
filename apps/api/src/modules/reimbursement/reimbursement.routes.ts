@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { prisma } from "@repo/db";
 import { authenticate } from "../../middleware/auth.js";
 import { requireRole } from "../../middleware/authorization.js";
+import { notifyRole } from "../notification/notify.js";
 
 const router = Router();
 
@@ -74,6 +75,16 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
       task: { select: { id: true, title: true } },
     },
   });
+  // Notify owner about new reimbursement
+  notifyRole({
+    tenantId: req.tenant!.id,
+    roles: ["OWNER"],
+    title: "Reimbursement Submitted",
+    message: `Reimbursement of ₹${amount} submitted by ${req.user!.name} for "${task.title}"`,
+    taskId: task_id,
+    excludeUserId: req.user!.id,
+  });
+
   res.status(201).json({ reimbursement: reimb });
 });
 

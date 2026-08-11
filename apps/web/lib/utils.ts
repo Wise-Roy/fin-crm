@@ -75,10 +75,10 @@ export const REIMB_CLS: Record<ReimbStatus, string> = {
 const ALL_VIEWS: View[] = ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "analytics"];
 
 export const ROLE_VIEWS: Record<Role, View[]> = {
-  OWNER: [...ALL_VIEWS, "configuration"],
-  ADMIN: ALL_VIEWS,
-  MANAGER: ALL_VIEWS,
-  EMPLOYEE: ALL_VIEWS,
+  OWNER: [...ALL_VIEWS, "configuration", "help"],
+  ADMIN: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "analytics", "help"],
+  MANAGER: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "help"],
+  EMPLOYEE: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "help"],
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -95,7 +95,7 @@ export const ROLE_BADGE: Record<Role, string> = {
   EMPLOYEE: "bg-amber-50 text-amber-700",
 };
 
-type Action = "add_task" | "add_client" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue";
+type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member";
 
 export const can = (role: Role, action: Action): boolean => {
   switch (action) {
@@ -105,22 +105,40 @@ export const can = (role: Role, action: Action): boolean => {
     // Only OWNER, ADMIN can add clients
     case "add_client":
       return (["OWNER", "ADMIN"] as Role[]).includes(role);
+    // Only OWNER, ADMIN can add DSC (not MANAGER, EMPLOYEE)
+    case "add_dsc":
+      return (["OWNER", "ADMIN"] as Role[]).includes(role);
     // Only OWNER can view/manage join requests
     case "view_requests":
     case "manage_team":
       return role === "OWNER";
+    // Only OWNER can add members
+    case "add_member":
+      return role === "OWNER";
     // OWNER, ADMIN, MANAGER see all tasks; EMPLOYEE sees own
     case "see_all":
       return (["OWNER", "ADMIN", "MANAGER"] as Role[]).includes(role);
-    // OWNER, ADMIN can approve reimbursements
+    // Only OWNER can approve reimbursements (not ADMIN per requirements)
     case "approve_reimb":
-      return (["OWNER", "ADMIN"] as Role[]).includes(role);
+      return role === "OWNER";
     // OWNER, ADMIN can manage payments (create)
     case "manage_payments":
       return (["OWNER", "ADMIN"] as Role[]).includes(role);
     // Only OWNER can mark payment done and view revenue
     case "mark_payment_done":
     case "view_revenue":
+      return role === "OWNER";
+    // OWNER, ADMIN can view analytics (not MANAGER, EMPLOYEE)
+    case "view_analytics":
+      return (["OWNER", "ADMIN"] as Role[]).includes(role);
+    // Only OWNER can see settings
+    case "view_settings":
+      return role === "OWNER";
+    // OWNER, ADMIN, MANAGER can view client details (not EMPLOYEE)
+    case "view_client_details":
+      return (["OWNER", "ADMIN", "MANAGER"] as Role[]).includes(role);
+    // Only OWNER can view employee performance in analytics
+    case "view_employee_performance":
       return role === "OWNER";
     default:
       return false;

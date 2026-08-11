@@ -17,7 +17,8 @@ export type View =
   | "dsc"
   | "reimbursements"
   | "analytics"
-  | "configuration";
+  | "configuration"
+  | "help";
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "WAITING_CLIENT" | "REVIEW" | "COMPLETED" | "CANCELLED";
 export type Priority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

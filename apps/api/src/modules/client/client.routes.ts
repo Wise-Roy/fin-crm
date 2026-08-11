@@ -5,6 +5,7 @@ import { authenticate } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/authorization.js';
 import { requireRole } from '../../middleware/authorization.js';
 import { PERMISSIONS } from '../../authorization/permissions.js';
+import { notifyRole } from '../notification/notify.js';
 
 const router = Router();
 
@@ -90,6 +91,16 @@ router.post(
       },
       include: { client_group: true },
     });
+
+    // Notify owner about new client
+    notifyRole({
+      tenantId: req.tenant!.id,
+      roles: ["OWNER"],
+      title: "Client Added",
+      message: `New client "${client.name}" added by ${req.user!.name}`,
+      excludeUserId: req.user!.id,
+    });
+
     res.status(201).json({ client });
   },
 );

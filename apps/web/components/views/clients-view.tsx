@@ -112,6 +112,7 @@ export function ClientsView({
   };
 
   const canAdd = can(userRole, "add_client");
+  const canViewDetails = can(userRole, "view_client_details");
 
   return (
     <div className="flex gap-4 h-[calc(100vh-140px)]">
@@ -183,7 +184,7 @@ export function ClientsView({
             const rev = clientPaymentTotals.get(c.id) || 0;
             return (
               <motion.button key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.025 }}
-                onClick={() => setSelected(selectedClient?.id === c.id ? null : c)}
+                onClick={() => canViewDetails && setSelected(selectedClient?.id === c.id ? null : c)}
                 className={`w-full text-left px-5 py-4 hover:bg-gray-50/70 transition-colors ${selectedClient?.id === c.id ? "bg-gray-50 border-l-2 border-l-gray-900" : ""}`}
               >
                 <div className="flex items-center justify-between gap-3">

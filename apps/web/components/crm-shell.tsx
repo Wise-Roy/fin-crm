@@ -16,6 +16,7 @@ import {
   Settings,
   Search,
   Shield,
+  HelpCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { View } from "@/lib/types";
@@ -34,8 +35,9 @@ import { DscView } from "@/components/dsc/dsc-view";
 import { ReimbursementsView } from "@/components/views/reimbursements-view";
 import { AnalyticsView } from "@/components/views/analytics-view";
 import { ConfigurationView } from "@/components/views/configuration-view";
+import { HelpView } from "@/components/views/help-view";
 import { useTheme } from "@/lib/theme-context";
-import { INIT_NOTIFS } from "@/lib/data";
+import { ROLE_VIEWS } from "@/lib/utils";
 import type {
   Task,
   Client,
@@ -59,6 +61,7 @@ const PAGE_TITLE: Record<View, string> = {
   reimbursements: "Reimbursements",
   analytics: "Analytics",
   configuration: "Configuration",
+  help: "Help & Guide",
 };
 
 const NAV_ITEMS: Array<{ id: View; label: string; icon: React.ElementType }> = [
@@ -87,7 +90,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const [dscEntries, setDscEntries] = useState<Dsc[]>([]);
   const [reimbs, setReimbs] = useState<Reimbursement[]>([]);
   const [payments, setPayments] = useState<TaskPayment[]>([]);
-  const [notifs, setNotifs] = useState<NotifType[]>(INIT_NOTIFS);
+  const [notifs, setNotifs] = useState<NotifType[]>([]);
 
   const [dateRange, setDateRange] = useState<DateRange>(getLast30DaysRange);
 
@@ -126,6 +129,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
         api.reimbursements.list({ limit: "100" }),
         api.dsc.list({ limit: "100" }),
         api.payments.list({ limit: "100" }),
+        api.notifications.list({ limit: "30" }),
       ];
       const results = await Promise.all(fetches);
       setTasks((results[0] as { data: Task[] }).data);
@@ -135,6 +139,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       setReimbs((results[4] as { data: Reimbursement[] }).data);
       setDscEntries((results[5] as { data: Dsc[] }).data);
       setPayments((results[6] as { data: TaskPayment[] }).data);
+      setNotifs((results[7] as { data: NotifType[] }).data);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
@@ -148,6 +153,17 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     fetchData(initialRef.current);
     initialRef.current = false;
   }, [fetchData]);
+
+  // Poll notifications every 30s
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await api.notifications.list({ limit: "30" });
+        setNotifs(data);
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -286,6 +302,12 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  // Guard: redirect to dashboard if current view not allowed for role
+  const allowedViews = ROLE_VIEWS[userRole] || [];
+  useEffect(() => {
+    if (!allowedViews.includes(view)) setView("dashboard");
+  }, [view, allowedViews]);
+
   const handleAddGroup = useCallback(async (clientId: string, groupName: string, email: string, phone: string) => {
     try {
       const { group } = await api.clients.createGroup(clientId, { group_name: groupName, email, phone });
@@ -315,8 +337,8 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const accentColor = theme.colors.accent;
 
   const navItems = [
-    ...NAV_ITEMS,
-    ...(userRole === "OWNER" ? [{ id: "configuration" as View, label: "Settings", icon: Settings }] : []),
+    ...NAV_ITEMS.filter((item) => allowedViews.includes(item.id)),
+    ...(allowedViews.includes("configuration") ? [{ id: "configuration" as View, label: "Settings", icon: Settings }] : []),
   ];
 
   const sidebarW = sidebarExpanded ? 200 : 68;
@@ -480,6 +502,17 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
 
           {/* Right: actions */}
           <div className="flex items-center justify-between gap-2">
+            {/* Help */}
+            <button
+              onClick={() => setView("help")}
+              className="w-9 h-9 flex items-center justify-center rounded-lg transition-colors"
+              style={{ color: view === "help" ? navbarFg : `${navbarFg}70` }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${navbarFg}06`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+              title="Help & Guide"
+            >
+              <HelpCircle size={18} />
+            </button>
             <div className="relative">
               <button
                 onClick={() => setShowNotifs(!showNotifs)}
@@ -499,7 +532,14 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 open={showNotifs}
                 onClose={() => setShowNotifs(false)}
                 notifications={notifs}
-                onMarkAll={() => setNotifs((p) => p.map((n) => ({ ...n, is_read: true })))}
+                onMarkAll={() => {
+                  setNotifs((p) => p.map((n) => ({ ...n, is_read: true })));
+                  api.notifications.markAllRead().catch(() => {});
+                }}
+                onMarkSelected={(ids) => {
+                  setNotifs((p) => p.map((n) => ids.includes(n.id) ? { ...n, is_read: true } : n));
+                  ids.forEach((id) => api.notifications.markRead(id).catch(() => {}));
+                }}
               />
             </div>
             {/* Add dropdown */}
@@ -523,14 +563,16 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                       Add Task
                     </button>
                   )}
-                  <button
-                    onClick={() => { setView("clients"); setShowAddMenu(false); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Building2 size={15} className="text-gray-400" />
-                    Add Client
-                  </button>
                   {can(userRole, "add_client") && (
+                    <button
+                      onClick={() => { setView("clients"); setShowAddMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Building2 size={15} className="text-gray-400" />
+                      Add Client
+                    </button>
+                  )}
+                  {can(userRole, "add_dsc") && (
                     <button
                       onClick={() => { setView("dsc"); setShowAddDsc(true); setShowAddMenu(false); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -616,6 +658,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 <AnalyticsView tasks={tasks} clients={clients} teamMembers={teamMembers} userRole={userRole} />
               )}
               {view === "configuration" && <ConfigurationView />}
+              {view === "help" && <HelpView />}
             </motion.div>
           </AnimatePresence>
         </main>

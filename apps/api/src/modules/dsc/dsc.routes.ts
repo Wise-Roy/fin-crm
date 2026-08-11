@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { prisma as _prisma } from "@repo/db";
 import { authenticate } from "../../middleware/auth.js";
+import { notifyRole } from "../notification/notify.js";
 
 // Cast needed until migration runs and Prisma adapter types refresh
 const prisma = _prisma as any;
@@ -98,6 +99,15 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
     include: DSC_INCLUDES,
   });
 
+  // Notify owner about new DSC
+  notifyRole({
+    tenantId: req.tenant!.id,
+    roles: ["OWNER"],
+    title: "DSC Added",
+    message: `New DSC "${dsc.name}" (${dsc.pan_number}) added by ${req.user!.name}`,
+    excludeUserId: req.user!.id,
+  });
+
   res.status(201).json({ dsc });
 });
 
@@ -138,6 +148,15 @@ router.put("/:id", authenticate, async (req: Request, res: Response): Promise<vo
     where: { id: req.params.id as string },
     data: updateData,
     include: DSC_INCLUDES,
+  });
+
+  // Notify owner about DSC update
+  notifyRole({
+    tenantId: req.tenant!.id,
+    roles: ["OWNER"],
+    title: "DSC Updated",
+    message: `DSC "${dsc.name}" (${dsc.pan_number}) updated by ${req.user!.name}`,
+    excludeUserId: req.user!.id,
   });
 
   res.json({ dsc });

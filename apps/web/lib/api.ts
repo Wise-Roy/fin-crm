@@ -1,4 +1,4 @@
-import type { Task, Client, ClientGroup, TeamMember, Reimbursement, Role, Category, SubCategory, TaskPayment, TaskHistory, ClientRevenue, Dsc } from "./types";
+import type { Task, Client, ClientGroup, TeamMember, Reimbursement, Role, Category, SubCategory, TaskPayment, TaskHistory, ClientRevenue, Dsc, Notification } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 const TOKEN_KEY = "fincrm_token";
@@ -298,6 +298,17 @@ export const api = {
       }),
     deleteLogo: () =>
       request<{ success: boolean }>("/config/logo", { method: "DELETE" }),
+  },
+
+  notifications: {
+    list: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+      return request<{ data: Notification[] }>(`/notifications${qs}`);
+    },
+    markAllRead: () =>
+      request<{ success: boolean }>("/notifications/mark-all-read", { method: "PATCH" }),
+    markRead: (id: string) =>
+      request<{ success: boolean }>(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" }),
   },
 
   categories: {

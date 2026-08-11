@@ -4,6 +4,7 @@ import { prisma } from "@repo/db";
 import { authenticate } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/authorization.js';
 import { PERMISSIONS } from '../../authorization/permissions.js';
+import { notify, notifyRole } from '../notification/notify.js';
 
 const router = Router();
 
@@ -173,6 +174,27 @@ router.post(
       },
       include: TASK_INCLUDES,
     });
+
+    // Notify assignee
+    if (task.assigned_to_employee_id && task.assigned_to_employee_id !== req.user!.id) {
+      notify({
+        tenantId: req.tenant!.id,
+        userId: task.assigned_to_employee_id,
+        title: "New Task Assigned",
+        message: `"${task.title}" has been assigned to you by ${req.user!.name}`,
+        taskId: task.id,
+      });
+    }
+    // Notify owner about new task
+    notifyRole({
+      tenantId: req.tenant!.id,
+      roles: ["OWNER"],
+      title: "Task Created",
+      message: `"${task.title}" created by ${req.user!.name}`,
+      taskId: task.id,
+      excludeUserId: req.user!.id,
+    });
+
     res.status(201).json({ task });
   },
 );
@@ -210,6 +232,31 @@ router.patch(
         },
       }),
     ]);
+
+    // Notify task creator and assignee about status change
+    const statusLabel = (status as string).replace(/_/g, " ").toLowerCase();
+    const targets = new Set<string>();
+    if (task.created_by && task.created_by !== req.user!.id) targets.add(task.created_by);
+    if (task.assigned_to_employee_id && task.assigned_to_employee_id !== req.user!.id) targets.add(task.assigned_to_employee_id);
+    targets.forEach((uid) => {
+      notify({
+        tenantId: req.tenant!.id,
+        userId: uid,
+        title: "Task Status Updated",
+        message: `"${task.title}" moved to ${statusLabel} by ${req.user!.name}`,
+        taskId: task.id,
+      });
+    });
+    // Notify owner
+    notifyRole({
+      tenantId: req.tenant!.id,
+      roles: ["OWNER"],
+      title: "Task Status Updated",
+      message: `"${task.title}" moved to ${statusLabel} by ${req.user!.name}`,
+      taskId: task.id,
+      excludeUserId: req.user!.id,
+    });
+
     res.json({ task });
   },
 );

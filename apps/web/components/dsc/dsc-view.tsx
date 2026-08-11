@@ -97,7 +97,7 @@ export function DscView({
             <p className="text-xs text-gray-400">{dateFiltered.length} digital signature certificates</p>
           </div>
         </div>
-        {can(userRole, "add_client") && (
+        {can(userRole, "add_dsc") && (
           <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
