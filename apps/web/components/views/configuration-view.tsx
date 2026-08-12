@@ -195,13 +195,13 @@ export function ConfigurationView() {
             Organisation Display Name
           </label>
           <p className="text-xs text-gray-400 mb-3">
-            Shown in sidebar header. Leave empty to use "FinCRM".
+            Shown in sidebar header. Defaults to "FinCRM".
           </p>
           <input
             type="text"
             value={orgName}
             onChange={(e) => setOrgName(e.target.value)}
-            placeholder="e.g. Acme Corp"
+            placeholder="FinCRM"
             className="w-full max-w-sm text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
           />
         </div>

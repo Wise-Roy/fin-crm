@@ -102,6 +102,14 @@ export function TasksView({
               </button>
             ))}
           </div>
+          {can(userRole, "add_task") && (
+            <button
+              onClick={onAddTask}
+              className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
+            >
+              <Plus size={14} /> Add Task
+            </button>
+          )}
         </div>
 
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">

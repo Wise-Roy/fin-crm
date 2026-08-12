@@ -36,6 +36,7 @@ import { ReimbursementsView } from "@/components/views/reimbursements-view";
 import { AnalyticsView } from "@/components/views/analytics-view";
 import { ConfigurationView } from "@/components/views/configuration-view";
 import { HelpView } from "@/components/views/help-view";
+import { AddMemberModal } from "@/components/add-member-modal";
 import { useTheme } from "@/lib/theme-context";
 import { ROLE_VIEWS } from "@/lib/utils";
 import type {
@@ -96,6 +97,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
 
   const [showAddTask, setShowAddTask] = useState(false);
   const [showAddDsc, setShowAddDsc] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
@@ -201,12 +203,22 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     setTeamMembers((prev) => [member, ...prev]);
   }, []);
 
-  const handleAddClient = useCallback(async (data: { name: string; email?: string; phone?: string }) => {
+  const handleAddClient = useCallback(async (data: Record<string, unknown>) => {
     try {
       const { client } = await api.clients.create(data);
       setClients((prev) => [client, ...prev]);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to create client";
+      alert(msg);
+    }
+  }, []);
+
+  const handleUpdateClient = useCallback(async (id: string, data: Record<string, unknown>) => {
+    try {
+      const { client } = await api.clients.update(id, data);
+      setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...client } : c)));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to update client";
       alert(msg);
     }
   }, []);
@@ -581,6 +593,15 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                       Add DSC
                     </button>
                   )}
+                  {can(userRole, "add_member") && (
+                    <button
+                      onClick={() => { setShowAddMember(true); setShowAddMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Users size={15} className="text-gray-400" />
+                      Add Member
+                    </button>
+                  )}
                   <button
                     onClick={() => { setView("reimbursements"); setShowAddMenu(false); }}
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -631,8 +652,9 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
               )}
               {view === "clients" && (
                 <ClientsView clients={clients} tasks={tasks} payments={payments}
-                  onAddClient={handleAddClient} onAddGroup={handleAddGroup}
-                  onUpdateGroup={handleUpdateGroup} onDeleteGroup={handleDeleteGroup} userRole={userRole} />
+                  onAddClient={handleAddClient} onUpdateClient={handleUpdateClient}
+                  onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup}
+                  onDeleteGroup={handleDeleteGroup} userRole={userRole} />
               )}
               {view === "team" && (
                 <TeamView teamMembers={teamMembers} tasks={tasks}
@@ -669,6 +691,18 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
         clients={clients} onClientsChange={setClients} teamMembers={teamMembers}
         categories={categories} onCategoriesChange={setCategories} onAdd={handleAddTask}
       />
+
+      <AnimatePresence>
+        {showAddMember && (
+          <AddMemberModal
+            onAdd={async (data) => {
+              await handleAddMember(data);
+              setShowAddMember(false);
+            }}
+            onClose={() => setShowAddMember(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

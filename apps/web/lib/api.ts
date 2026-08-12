@@ -120,7 +120,7 @@ export const api = {
       return request<PaginatedResponse<Client>>(`/clients${qs}`);
     },
     getById: (id: string) => request<{ client: Client }>(`/clients/${encodeURIComponent(id)}`),
-    create: (data: { name: string; email?: string; phone?: string }) =>
+    create: (data: Record<string, unknown>) =>
       request<{ client: Client }>("/clients", {
         method: "POST",
         body: JSON.stringify(data),

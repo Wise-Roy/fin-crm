@@ -79,16 +79,23 @@ router.post(
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_CREATE),
   async (req: Request, res: Response): Promise<void> => {
-    const { name, email, phone } = req.body as { name?: string; email?: string; phone?: string };
+    const { name, email, phone } = req.body as Record<string, string | undefined>;
     if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
+    const kycData: Record<string, unknown> = {};
+    const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
+    for (const k of kycKeys) {
+      const v = (req.body as Record<string, string | undefined>)[k];
+      if (v) kycData[k] = v;
+    }
     const client = await prisma.client.create({
       data: {
         tenant_id: req.tenant!.id,
         name,
         email: email || null,
         phone: phone || null,
-      },
+        ...kycData,
+      } as any,
       include: { client_group: true },
     });
 
@@ -179,16 +186,19 @@ router.put(
     const existing = await prisma.client.findFirst({ where: { id: req.params.id as string, tenant_id: req.tenant!.id } });
     if (!existing) { res.status(404).json({ error: "Client not found" }); return; }
 
-    const { name, email, phone, is_active } = req.body as { name?: string; email?: string; phone?: string; is_active?: boolean };
+    const body = req.body as Record<string, string | boolean | undefined>;
+    const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
+    const data: Record<string, unknown> = { updated_at: new Date() };
+    if (body.name !== undefined) data.name = body.name;
+    if (body.email !== undefined) data.email = body.email;
+    if (body.phone !== undefined) data.phone = body.phone;
+    if (body.is_active !== undefined) data.is_active = body.is_active;
+    for (const k of kycKeys) {
+      if (body[k] !== undefined) data[k] = body[k] || null;
+    }
     const client = await prisma.client.update({
       where: { id: req.params.id as string },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(email !== undefined && { email }),
-        ...(phone !== undefined && { phone }),
-        ...(is_active !== undefined && { is_active }),
-        updated_at: new Date(),
-      },
+      data: data as any,
     });
     res.json({ client });
   },

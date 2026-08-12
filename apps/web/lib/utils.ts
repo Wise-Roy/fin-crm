@@ -95,7 +95,7 @@ export const ROLE_BADGE: Record<Role, string> = {
   EMPLOYEE: "bg-amber-50 text-amber-700",
 };
 
-type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member";
+type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member" | "edit_client";
 
 export const can = (role: Role, action: Action): boolean => {
   switch (action) {
@@ -115,6 +115,9 @@ export const can = (role: Role, action: Action): boolean => {
     // Only OWNER can add members
     case "add_member":
       return role === "OWNER";
+    // Only OWNER, ADMIN can edit clients/groups
+    case "edit_client":
+      return (["OWNER", "ADMIN"] as Role[]).includes(role);
     // OWNER, ADMIN, MANAGER see all tasks; EMPLOYEE sees own
     case "see_all":
       return (["OWNER", "ADMIN", "MANAGER"] as Role[]).includes(role);

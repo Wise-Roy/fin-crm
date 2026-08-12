@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import type { AuthMode } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
+import { validateName, validateEmail } from "@/lib/validations";
 
 
 export function AuthModal({
@@ -72,10 +73,14 @@ export function AuthModal({
     }
   };
 
+  const signupNameErr = mode === "signup" ? validateName(name).error : undefined;
+  const signupEmailErr = mode === "signup" ? validateEmail(email).error : undefined;
+
   const handleCreateOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     clearError();
+    if (signupNameErr || signupEmailErr) return;
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -259,6 +264,7 @@ export function AuthModal({
                       placeholder="Pritesh Gadiya"
                       className={inputCls}
                     />
+                    {signupNameErr && <p className="text-xs text-red-500 mt-1">{signupNameErr}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider">
@@ -272,6 +278,7 @@ export function AuthModal({
                       placeholder="admin@yourfirm.in"
                       className={inputCls}
                     />
+                    {signupEmailErr && <p className="text-xs text-red-500 mt-1">{signupEmailErr}</p>}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider">

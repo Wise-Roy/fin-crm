@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Building2, X, Users, FolderPlus, IndianRupee, Trash2, Edit3 } from "lucide-react";
+import { Plus, Building2, X, Users, FolderPlus, IndianRupee, Trash2, Edit3, ChevronDown, ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Task, Client, ClientGroup, TaskPayment, ClientRevenue, Role } from "@/lib/types";
+import type { Task, Client, ClientGroup, ClientKyc, TaskPayment, ClientRevenue, Role } from "@/lib/types";
 import { can, fmtDate, fmtINR } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui-atoms";
 import { api } from "@/lib/api";
+import { ClientKycForm, hasKycErrors } from "@/components/client-kyc-form";
+import { validateName, validateEmail, validatePhone } from "@/lib/validations";
 
 type AddMode = "client" | "group" | null;
 
@@ -15,6 +17,7 @@ export function ClientsView({
   tasks,
   payments,
   onAddClient,
+  onUpdateClient,
   onAddGroup,
   onUpdateGroup,
   onDeleteGroup,
@@ -23,7 +26,8 @@ export function ClientsView({
   clients: Client[];
   tasks: Task[];
   payments: TaskPayment[];
-  onAddClient: (c: { name: string; email?: string; phone?: string }) => void;
+  onAddClient: (c: Record<string, unknown>) => void;
+  onUpdateClient: (id: string, data: Record<string, unknown>) => void;
   onAddGroup: (clientId: string, groupName: string, email: string, phone: string) => void;
   onUpdateGroup: (clientId: string, groupId: string, data: Record<string, unknown>) => void;
   onDeleteGroup: (clientId: string, groupId: string) => void;
@@ -37,6 +41,14 @@ export function ClientsView({
 
   // Client form
   const [clientForm, setClientForm] = useState({ name: "", email: "", phone: "" });
+  const [clientKyc, setClientKyc] = useState<ClientKyc>({});
+  const [showKycForm, setShowKycForm] = useState(false);
+
+  // Edit client state
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
+  const [editKyc, setEditKyc] = useState<ClientKyc>({});
+  const [showEditKyc, setShowEditKyc] = useState(false);
   // Group form
   const [groupClientId, setGroupClientId] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -76,15 +88,30 @@ export function ClientsView({
     }
   });
 
+  const clientNameErr = validateName(clientForm.name).error;
+  const clientEmailErr = validateEmail(clientForm.email).error;
+  const clientPhoneErr = validatePhone(clientForm.phone).error;
+
   const submitClient = () => {
-    if (!clientForm.name) return;
-    onAddClient({ name: clientForm.name, email: clientForm.email || undefined, phone: clientForm.phone || undefined });
+    if (!clientForm.name || clientNameErr || clientEmailErr || clientPhoneErr) return;
+    if (hasKycErrors(clientKyc)) return;
+    const kycData: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(clientKyc)) {
+      if (v) kycData[k] = v;
+    }
+    onAddClient({ name: clientForm.name, email: clientForm.email || undefined, phone: clientForm.phone || undefined, ...kycData });
     setClientForm({ name: "", email: "", phone: "" });
+    setClientKyc({});
+    setShowKycForm(false);
     setAddMode(null);
   };
 
+  const groupNameErr = validateName(groupName).error;
+  const groupEmailErr = validateEmail(groupEmail).error;
+  const groupPhoneErr = validatePhone(groupPhone).error;
+
   const submitGroup = () => {
-    if (!groupClientId || !groupName.trim()) return;
+    if (!groupClientId || !groupName.trim() || groupNameErr || groupEmailErr || groupPhoneErr) return;
     onAddGroup(groupClientId, groupName.trim(), groupEmail.trim(), groupPhone.trim());
     setGroupName(""); setGroupEmail(""); setGroupPhone(""); setGroupClientId("");
     setAddMode(null);
@@ -111,7 +138,48 @@ export function ClientsView({
     setEditingGroup(null);
   };
 
+  const startEditClient = (c: Client) => {
+    setEditForm({ name: c.name, email: c.email || "", phone: c.phone || "" });
+    setEditKyc({
+      business_pan: c.business_pan || "",
+      address_line1: c.address_line1 || "",
+      address_line2: c.address_line2 || "",
+      city: c.city || "",
+      state: c.state || "",
+      country: c.country || "India",
+      pincode: c.pincode || "",
+      llpin: c.llpin || "",
+      din: c.din || "",
+      cin: c.cin || "",
+      gst_number: c.gst_number || "",
+      gst_state_code: c.gst_state_code || "",
+      gst_dest_address: c.gst_dest_address || "",
+    });
+    setShowEditKyc(false);
+    setEditMode(true);
+  };
+
+  const editNameErr = validateName(editForm.name).error;
+  const editEmailErr = validateEmail(editForm.email).error;
+  const editPhoneErr = validatePhone(editForm.phone).error;
+
+  const saveEditClient = () => {
+    if (!selectedClient || !editForm.name || editNameErr || editEmailErr || editPhoneErr) return;
+    if (hasKycErrors(editKyc)) return;
+    const data: Record<string, unknown> = {
+      name: editForm.name,
+      email: editForm.email || null,
+      phone: editForm.phone || null,
+    };
+    for (const [k, v] of Object.entries(editKyc)) {
+      data[k] = v || null;
+    }
+    onUpdateClient(selectedClient.id, data);
+    setEditMode(false);
+  };
+
   const canAdd = can(userRole, "add_client");
+  const canEdit = can(userRole, "edit_client");
   const canViewDetails = can(userRole, "view_client_details");
 
   return (
@@ -139,16 +207,36 @@ export function ClientsView({
         <AnimatePresence>
           {addMode === "client" && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden shrink-0">
-              <div className="mx-5 mt-4 mb-2 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+              <div className="mx-5 mt-4 mb-2 p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3 max-h-[60vh] overflow-auto">
                 <p className="text-xs font-semibold text-gray-700">Add New Client</p>
                 <div className="grid grid-cols-2 gap-2.5">
-                  {(([["Name *", "name", false], ["Email", "email", false], ["Phone", "phone", true]] as const)).map(([ph, key, mono]) => (
-                    <input key={key} placeholder={ph} value={clientForm[key]} onChange={(e) => setClientForm((p) => ({ ...p, [key]: e.target.value }))} className={`border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white ${mono ? "" : ""}`} />
-                  ))}
+                  <div>
+                    <input placeholder="Name *" value={clientForm.name} onChange={(e) => setClientForm((p) => ({ ...p, name: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                    {clientNameErr && <p className="text-xs text-red-500 mt-0.5">{clientNameErr}</p>}
+                  </div>
+                  <div>
+                    <input placeholder="Email" value={clientForm.email} onChange={(e) => setClientForm((p) => ({ ...p, email: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                    {clientEmailErr && <p className="text-xs text-red-500 mt-0.5">{clientEmailErr}</p>}
+                  </div>
+                  <div>
+                    <input placeholder="Phone" value={clientForm.phone} onChange={(e) => setClientForm((p) => ({ ...p, phone: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                    {clientPhoneErr && <p className="text-xs text-red-500 mt-0.5">{clientPhoneErr}</p>}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowKycForm(!showKycForm)}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors"
+                >
+                  {showKycForm ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  KYC Details
+                </button>
+                {showKycForm && (
+                  <ClientKycForm initial={clientKyc} onChange={setClientKyc} />
+                )}
                 <div className="flex gap-2">
-                  <button onClick={() => setAddMode(null)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
-                  <button onClick={submitClient} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">Add Client</button>
+                  <button onClick={() => { setAddMode(null); setShowKycForm(false); }} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
+                  <button onClick={submitClient} disabled={!clientForm.name || !!clientNameErr || !!clientEmailErr || !!clientPhoneErr || hasKycErrors(clientKyc)} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">Add Client</button>
                 </div>
               </div>
             </motion.div>
@@ -162,9 +250,18 @@ export function ClientsView({
                     <option value="">Select Client *</option>
                     {clients.filter((c) => c.is_active).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
                   </select>
-                  <input placeholder="Group Name *" value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                  <input type="email" placeholder="Group Email" value={groupEmail} onChange={(e) => setGroupEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                  <input type="tel" placeholder="Group Phone" value={groupPhone} onChange={(e) => setGroupPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 " />
+                  <div>
+                    <input placeholder="Group Name *" value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                    {groupNameErr && <p className="text-xs text-red-500 mt-0.5">{groupNameErr}</p>}
+                  </div>
+                  <div>
+                    <input type="email" placeholder="Group Email" value={groupEmail} onChange={(e) => setGroupEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                    {groupEmailErr && <p className="text-xs text-red-500 mt-0.5">{groupEmailErr}</p>}
+                  </div>
+                  <div>
+                    <input type="tel" placeholder="Group Phone" value={groupPhone} onChange={(e) => setGroupPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                    {groupPhoneErr && <p className="text-xs text-red-500 mt-0.5">{groupPhoneErr}</p>}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setAddMode(null)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
@@ -229,11 +326,63 @@ export function ClientsView({
                 <h3 className="text-base font-semibold text-gray-900 truncate">{selectedClient.name}</h3>
                 <span className="text-xs text-gray-400">{selectedClient.is_active ? "Active" : "Inactive"}</span>
               </div>
-              <button onClick={() => setSelected(null)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors shrink-0">
-                <X size={13} className="text-gray-400" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {canEdit && !editMode && (
+                  <button onClick={() => startEditClient(selectedClient)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors" title="Edit client">
+                    <Edit3 size={13} className="text-gray-400" />
+                  </button>
+                )}
+                <button onClick={() => { setSelected(null); setEditMode(false); }} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors">
+                  <X size={13} className="text-gray-400" />
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto p-5 space-y-5">
+              {/* Edit Mode */}
+              {editMode ? (
+                <div className="space-y-4">
+                  <p className="text-xs font-semibold text-gray-700">Edit Client</p>
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Name *</label>
+                      <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {editNameErr && <p className="text-xs text-red-500 mt-0.5">{editNameErr}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Email</label>
+                      <input value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {editEmailErr && <p className="text-xs text-red-500 mt-0.5">{editEmailErr}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Phone</label>
+                      <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {editPhoneErr && <p className="text-xs text-red-500 mt-0.5">{editPhoneErr}</p>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditKyc(!showEditKyc)}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    {showEditKyc ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    KYC Details
+                  </button>
+                  {showEditKyc && (
+                    <ClientKycForm initial={editKyc} onChange={setEditKyc} />
+                  )}
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={() => setEditMode(false)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button onClick={saveEditClient} disabled={!editForm.name || !!editNameErr || !!editEmailErr || !!editPhoneErr || hasKycErrors(editKyc)}
+                      className="text-sm font-medium bg-gray-900 text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              ) : (
+              <>
               {/* Info */}
               <div className="grid grid-cols-2 gap-3">
                 {(([
@@ -248,6 +397,42 @@ export function ClientsView({
                   </div>
                 ))}
               </div>
+
+              {/* KYC Details */}
+              {(selectedClient.business_pan || selectedClient.gst_number || selectedClient.din || selectedClient.cin || selectedClient.llpin) && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">KYC</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {([
+                      ["PAN", selectedClient.business_pan],
+                      ["GSTIN", selectedClient.gst_number],
+                      ["GST State", selectedClient.gst_state_code],
+                      ["LLPIN", selectedClient.llpin],
+                      ["DIN", selectedClient.din],
+                      ["CIN", selectedClient.cin],
+                    ] as const).filter(([, v]) => v).map(([l, v]) => (
+                      <div key={l}>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">{l}</div>
+                        <div className="text-xs font-medium text-gray-800 font-mono truncate">{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedClient.address_line1 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Address</div>
+                      <div className="text-xs text-gray-800">
+                        {[selectedClient.address_line1, selectedClient.address_line2, selectedClient.city, selectedClient.state, selectedClient.country, selectedClient.pincode].filter(Boolean).join(", ")}
+                      </div>
+                    </div>
+                  )}
+                  {selectedClient.gst_dest_address && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">GST Dest. Address</div>
+                      <div className="text-xs text-gray-800">{selectedClient.gst_dest_address}</div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Revenue (OWNER only) */}
               {can(userRole, "view_revenue") && revenue && (
@@ -272,7 +457,7 @@ export function ClientsView({
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Groups ({groups.length})</h4>
-                  {canAdd && (
+                  {canEdit && (
                     <button onClick={() => setShowDetailAddGroup(!showDetailAddGroup)} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1 transition-colors">
                       <Plus size={10} /> Add Group
                     </button>
@@ -314,7 +499,7 @@ export function ClientsView({
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-400 ">{groupTasks.length} tasks</span>
-                            {canAdd && !isEditing && (
+                            {canEdit && !isEditing && (
                               <div className="flex items-center gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
                                 <button onClick={() => startEditGroup(g)} className="text-gray-400 hover:text-gray-700"><Edit3 size={10} /></button>
                                 <button onClick={() => onDeleteGroup(selectedClient.id, g.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={10} /></button>
@@ -344,6 +529,8 @@ export function ClientsView({
                   )}
                 </div>
               </div>
+              </>
+              )}
             </div>
           </motion.div>
         )}

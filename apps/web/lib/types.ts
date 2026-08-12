@@ -99,7 +99,23 @@ export interface ClientGroup {
   updated_at?: string;
 }
 
-export interface Client {
+export interface ClientKyc {
+  business_pan?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
+  llpin?: string | null;
+  din?: string | null;
+  cin?: string | null;
+  gst_number?: string | null;
+  gst_state_code?: string | null;
+  gst_dest_address?: string | null;
+}
+
+export interface Client extends ClientKyc {
   id: string;
   tenant_id: string;
   name: string;

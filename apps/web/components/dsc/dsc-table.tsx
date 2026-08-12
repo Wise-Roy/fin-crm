@@ -90,20 +90,22 @@ export function DscTable({
                           <span className="text-gray-400 uppercase tracking-wider block mb-1">Mobile</span>
                           <span className="text-gray-700">{dsc.mobile_number || "—"}</span>
                         </div>
-                        <div>
-                          <span className="text-gray-400 uppercase tracking-wider block mb-1">Password</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-700 font-mono">
-                              {visiblePw.has(dsc.id) ? dsc.password : "••••••••"}
-                            </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); togglePw(dsc.id); }}
-                              className="text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                              {visiblePw.has(dsc.id) ? <EyeOff size={12} /> : <Eye size={12} />}
-                            </button>
+                        {userRole !== "EMPLOYEE" && (
+                          <div>
+                            <span className="text-gray-400 uppercase tracking-wider block mb-1">Password</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-700 font-mono">
+                                {visiblePw.has(dsc.id) ? dsc.password : "••••••••"}
+                              </span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); togglePw(dsc.id); }}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                              >
+                                {visiblePw.has(dsc.id) ? <EyeOff size={12} /> : <Eye size={12} />}
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div>
                           <span className="text-gray-400 uppercase tracking-wider block mb-1">Added By</span>
                           <span className="text-gray-700">{dsc.created_by_user?.name || "—"}</span>
