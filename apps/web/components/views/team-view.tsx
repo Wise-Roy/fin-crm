@@ -2,25 +2,33 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import type { Task, TeamMember, Role } from "@/lib/types";
 import { STATUS_CFG, isOverdue, getInitials, ROLE_LABELS, ROLE_BADGE } from "@/lib/utils";
 import { AddMemberModal } from "@/components/add-member-modal";
+import { EditMemberModal } from "@/components/edit-member-modal";
 
 export function TeamView({
   teamMembers,
   tasks,
   onAddMember,
+  onUpdateMember,
   userRole,
+  currentUserId,
 }: {
   teamMembers: TeamMember[];
   tasks: Task[];
   onAddMember: (data: {
     name: string; email: string; password: string; role: string; position?: string; phone?: string;
   }) => Promise<void>;
+  onUpdateMember: (id: string, data: {
+    name?: string; email?: string; phone?: string; position?: string; role?: string; password?: string;
+  }) => Promise<void>;
   userRole: Role;
+  currentUserId: string;
 }) {
   const [showAddMember, setShowAddMember] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   return (
     <div>
@@ -65,7 +73,16 @@ export function TeamView({
                   <div className="w-11 h-11 rounded-xl bg-gray-900 text-white flex items-center justify-center font-semibold text-sm shrink-0">
                     {getInitials(member.name)}
                   </div>
-                  <div>
+                  <div className="flex-1">
+                    {userRole === "OWNER" && (
+                      <button
+                        onClick={() => setEditingMember(member)}
+                        className="float-right w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+                        title="Edit member"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    )}
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-gray-900">
                         {member.name}
@@ -140,6 +157,14 @@ export function TeamView({
               setShowAddMember(false);
             }}
             onClose={() => setShowAddMember(false)}
+          />
+        )}
+        {editingMember && (
+          <EditMemberModal
+            member={editingMember}
+            isOwnerSelf={editingMember.id === currentUserId}
+            onUpdate={onUpdateMember}
+            onClose={() => setEditingMember(null)}
           />
         )}
       </AnimatePresence>

@@ -27,5 +27,8 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "resend": "^6.19.0"
+  }
 }

@@ -99,6 +99,7 @@ export const api = {
       email: string;
       password: string;
       organizationName: string;
+      phone: string;
     }) =>
       request<AuthResponse>("/auth/signup", {
         method: "POST",
@@ -107,6 +108,24 @@ export const api = {
 
     login: (data: { email: string; password: string; subdomain?: string }) =>
       request<AuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    verifyOtp: (data: { email: string; otp: string }) =>
+      request<AuthResponse>("/auth/verify-otp", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+
+    forgotPassword: (email: string) =>
+      request<{ message: string }>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+
+    resetPassword: (data: { token: string; password: string }) =>
+      request<{ message: string }>("/auth/reset-password", {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -279,6 +298,18 @@ export const api = {
     }) =>
       request<{ member: TeamMember }>("/team", {
         method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      position?: string;
+      role?: string;
+      password?: string;
+    }) =>
+      request<{ member: TeamMember }>(`/team/${encodeURIComponent(id)}`, {
+        method: "PUT",
         body: JSON.stringify(data),
       }),
   },

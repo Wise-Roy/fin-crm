@@ -104,4 +104,93 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
   res.status(201).json({ member });
 });
 
+/**
+ * PUT /api/team/:id
+ * Owner can update any member's info and optionally change their password.
+ * Body: { name?, email?, phone?, position?, role?, password? }
+ */
+router.put("/:id", authenticate, async (req: Request, res: Response): Promise<void> => {
+  const user = req.user!;
+
+  if (user.role !== "OWNER") {
+    res.status(403).json({ error: "Only the owner can update team members" });
+    return;
+  }
+
+  const memberId = req.params.id as string;
+
+  const target = await prisma.user.findFirst({
+    where: { id: memberId, tenantId: user.tenantId },
+  });
+
+  if (!target) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+
+  const { name, email, phone, position, role, password } = req.body as {
+    name?: string;
+    email?: string;
+    phone?: string;
+    position?: string;
+    role?: string;
+    password?: string;
+  };
+
+  const updateData: Record<string, unknown> = {};
+
+  if (name !== undefined) updateData.name = name.trim();
+
+  if (email !== undefined) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail !== target.email) {
+      const existing = await prisma.user.findUnique({
+        where: { tenantId_email: { tenantId: user.tenantId, email: normalizedEmail } },
+      });
+      if (existing) {
+        res.status(409).json({ error: "A member with this email already exists" });
+        return;
+      }
+      updateData.email = normalizedEmail;
+    }
+  }
+
+  if (phone !== undefined) updateData.phone = phone.trim() || null;
+  if (position !== undefined) updateData.position = position.trim() || null;
+
+  if (role !== undefined) {
+    // Cannot change own role or demote self
+    if (target.id === user.id) {
+      res.status(400).json({ error: "Cannot change your own role" });
+      return;
+    }
+    const validRoles = ["ADMIN", "MANAGER", "EMPLOYEE"];
+    if (!validRoles.includes(role)) {
+      res.status(400).json({ error: `Role must be one of: ${validRoles.join(", ")}` });
+      return;
+    }
+    updateData.role = role;
+  }
+
+  if (password !== undefined) {
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+    updateData.password_hash = await bcrypt.hash(password, 12);
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: memberId as string },
+    data: updateData as any,
+  });
+
+  res.json({ member: updated });
+});
+
 export default router;

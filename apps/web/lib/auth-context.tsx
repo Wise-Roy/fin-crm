@@ -25,8 +25,10 @@ interface AuthContextValue extends AuthState {
     name: string,
     email: string,
     password: string,
-    organizationName: string
-  ) => Promise<void>;
+    organizationName: string,
+    phone: string
+  ) => Promise<string>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
   signOut: () => void;
   clearError: () => void;
 }
@@ -124,14 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(
-    async (name: string, email: string, password: string, organizationName: string) => {
+    async (name: string, email: string, password: string, organizationName: string, phone: string): Promise<string> => {
       setState((s) => ({ ...s, error: null }));
       try {
-        const res = await api.auth.signup({ name, email, password, organizationName });
-        setToken(res.token);
-        const user = toAuthUser(res.user);
-        saveUser(user);
-        setState({ appUser: user, loading: false, error: null });
+        const res = await api.auth.signup({ name, email, password, organizationName, phone }) as unknown as { email: string; message: string };
+        return res.email;
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : "Signup failed";
         setState((s) => ({ ...s, loading: false, error: msg }));
@@ -140,6 +139,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     []
   );
+
+  const verifyOtp = useCallback(async (email: string, otp: string) => {
+    setState((s) => ({ ...s, error: null }));
+    try {
+      const res = await api.auth.verifyOtp({ email, otp });
+      setToken(res.token);
+      const user = toAuthUser(res.user);
+      saveUser(user);
+      setState({ appUser: user, loading: false, error: null });
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "OTP verification failed";
+      setState((s) => ({ ...s, loading: false, error: msg }));
+      throw new Error(msg);
+    }
+  }, []);
 
   const signOut = useCallback(() => {
     clearToken();
@@ -153,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ ...state, signIn, signUp, signOut, clearError }}
+      value={{ ...state, signIn, signUp, verifyOtp, signOut, clearError }}
     >
       {children}
     </AuthContext.Provider>

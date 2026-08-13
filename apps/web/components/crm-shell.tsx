@@ -203,6 +203,13 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     setTeamMembers((prev) => [member, ...prev]);
   }, []);
 
+  const handleUpdateMember = useCallback(async (id: string, data: {
+    name?: string; email?: string; phone?: string; position?: string; role?: string; password?: string;
+  }) => {
+    const { member } = await api.team.update(id, data);
+    setTeamMembers((prev) => prev.map((m) => m.id === id ? member : m));
+  }, []);
+
   const handleAddClient = useCallback(async (data: Record<string, unknown>) => {
     try {
       const { client } = await api.clients.create(data);
@@ -658,7 +665,8 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
               )}
               {view === "team" && (
                 <TeamView teamMembers={teamMembers} tasks={tasks}
-                  onAddMember={handleAddMember} userRole={userRole} />
+                  onAddMember={handleAddMember} onUpdateMember={handleUpdateMember}
+                  userRole={userRole} currentUserId={appUser?.id || ""} />
               )}
               {view === "dsc" && (
                 <DscView
