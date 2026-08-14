@@ -72,12 +72,12 @@ export const REIMB_CLS: Record<ReimbStatus, string> = {
   PAID: "bg-blue-50 text-blue-700",
 };
 
-const ALL_VIEWS: View[] = ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "analytics"];
+const ALL_VIEWS: View[] = ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "analytics", "data_import"];
 
 export const ROLE_VIEWS: Record<Role, View[]> = {
   OWNER: [...ALL_VIEWS, "configuration", "help"],
-  ADMIN: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "analytics", "help"],
-  MANAGER: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "help"],
+  ADMIN: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "analytics", "data_import", "help"],
+  MANAGER: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "data_import", "help"],
   EMPLOYEE: ["dashboard", "tasks", "clients", "team", "dsc", "reimbursements", "help"],
 };
 
@@ -95,7 +95,7 @@ export const ROLE_BADGE: Record<Role, string> = {
   EMPLOYEE: "bg-amber-50 text-amber-700",
 };
 
-type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member" | "edit_client";
+type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member" | "edit_client" | "import_data";
 
 export const can = (role: Role, action: Action): boolean => {
   switch (action) {
@@ -137,6 +137,9 @@ export const can = (role: Role, action: Action): boolean => {
     // Only OWNER can see settings
     case "view_settings":
       return role === "OWNER";
+    // OWNER, ADMIN, MANAGER can import data
+    case "import_data":
+      return (["OWNER", "ADMIN", "MANAGER"] as Role[]).includes(role);
     // OWNER, ADMIN, MANAGER can view client details (not EMPLOYEE)
     case "view_client_details":
       return (["OWNER", "ADMIN", "MANAGER"] as Role[]).includes(role);

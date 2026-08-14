@@ -342,6 +342,37 @@ export const api = {
       request<{ success: boolean }>(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" }),
   },
 
+  import: {
+    templateTasks: () => `${API_URL}/import/template/tasks`,
+    templateClients: () => `${API_URL}/import/template/clients`,
+    tasks: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      const token = getToken();
+      const res = await fetch(`${API_URL}/import/tasks`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      const body = await res.json();
+      if (!res.ok) throw new ApiError(body.error || "Import failed", res.status, body);
+      return body as { message: string; count: number; created_categories: number; created_subcategories: number; created_clients: number; created_client_groups: number };
+    },
+    clients: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      const token = getToken();
+      const res = await fetch(`${API_URL}/import/clients`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      const body = await res.json();
+      if (!res.ok) throw new ApiError(body.error || "Import failed", res.status, body);
+      return body as { message: string; clientsCreated: number; clientsUpdated: number; groupsCreated: number };
+    },
+  },
+
   categories: {
     list: () => request<{ data: Category[] }>("/categories"),
 

@@ -17,6 +17,7 @@ export type View =
   | "dsc"
   | "reimbursements"
   | "analytics"
+  | "data_import"
   | "configuration"
   | "help";
 

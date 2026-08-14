@@ -17,6 +17,7 @@ import {
   Search,
   Shield,
   HelpCircle,
+  FileSpreadsheet,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { View } from "@/lib/types";
@@ -36,6 +37,7 @@ import { ReimbursementsView } from "@/components/views/reimbursements-view";
 import { AnalyticsView } from "@/components/views/analytics-view";
 import { ConfigurationView } from "@/components/views/configuration-view";
 import { HelpView } from "@/components/views/help-view";
+import { DataImportView } from "@/components/views/data-import-view";
 import { AddMemberModal } from "@/components/add-member-modal";
 import { useTheme } from "@/lib/theme-context";
 import { ROLE_VIEWS } from "@/lib/utils";
@@ -61,6 +63,7 @@ const PAGE_TITLE: Record<View, string> = {
   dsc: "DSC",
   reimbursements: "Reimbursements",
   analytics: "Analytics",
+  data_import: "Data Import",
   configuration: "Configuration",
   help: "Help & Guide",
 };
@@ -73,6 +76,7 @@ const NAV_ITEMS: Array<{ id: View; label: string; icon: React.ElementType }> = [
   { id: "dsc", label: "DSC", icon: Signature },
   { id: "reimbursements", label: "Reimb.", icon: Receipt },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "data_import", label: "Data Import", icon: FileSpreadsheet },
 ];
 
 export function CRMShell({ onLogout }: { onLogout: () => void }) {
@@ -686,6 +690,9 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
               )}
               {view === "analytics" && (
                 <AnalyticsView tasks={tasks} clients={clients} teamMembers={teamMembers} userRole={userRole} />
+              )}
+              {view === "data_import" && (
+                <DataImportView userRole={userRole} onImportComplete={() => fetchData()} />
               )}
               {view === "configuration" && <ConfigurationView />}
               {view === "help" && <HelpView />}
