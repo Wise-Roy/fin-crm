@@ -11,14 +11,20 @@ import dscRoutes from './modules/dsc/dsc.routes.js'
 import configRoutes from './modules/tenant/tenant-config.routes.js'
 import notificationRoutes from './modules/notification/notification.routes.js'
 import dataImportRoutes from './modules/data-import/data-import.routes.js'
+import { prisma } from '@repo/db'
 import './types/auth'
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 
-app.get('/api/health',(_,res)=>{
-    res.json({status: 'API is running'});
+app.get('/api/health', async (_,res)=>{
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    } catch {
+        res.status(503).json({ status: 'error', db: 'disconnected' });
+    }
 })
 
 app.use('/api/auth', authRoutes);
