@@ -158,7 +158,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ name }),
       }),
-    createGroup: (clientId: string, data: { group_name: string; email?: string; phone?: string }) =>
+    createGroup: (clientId: string, data: Record<string, unknown>) =>
       request<{ group: ClientGroup }>(`/clients/${encodeURIComponent(clientId)}/groups`, {
         method: "POST",
         body: JSON.stringify(data),

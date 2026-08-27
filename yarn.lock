@@ -375,6 +375,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@getbrevo/brevo@npm:^6.0.3":
+  version: 6.0.3
+  resolution: "@getbrevo/brevo@npm:6.0.3"
+  checksum: 10c0/5e57770f0efe24d6d20964d74f3488feda4865f0188743342b3fae40337c9685323c58d877a08955f9dd9826f920939f84e6e789d92f4271cf54a6e0b15493ef
+  languageName: node
+  linkType: hard
+
 "@humanfs/core@npm:^0.19.2":
   version: 0.19.2
   resolution: "@humanfs/core@npm:0.19.2"
@@ -3442,6 +3449,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "fin-crm@workspace:."
   dependencies:
+    "@getbrevo/brevo": "npm:^6.0.3"
     prettier: "npm:^3.7.4"
     resend: "npm:^6.19.0"
     supabase: "npm:^2.110.0"

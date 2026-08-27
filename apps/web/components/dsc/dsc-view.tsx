@@ -13,6 +13,7 @@ export function DscView({
   entries,
   clients,
   onAdd,
+  onUpdate,
   onDelete,
   userRole,
   dateRange,
@@ -27,6 +28,7 @@ export function DscView({
     password: string; client_id?: string; client_group_id?: string;
     position?: string; mobile_number?: string;
   }) => Promise<void>;
+  onUpdate: (id: string, data: Record<string, unknown>) => void;
   onDelete: (id: string) => void;
   userRole: Role;
   dateRange?: DateRange;
@@ -142,7 +144,7 @@ export function DscView({
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <DscTable entries={filtered} onDelete={onDelete} userRole={userRole} />
+        <DscTable entries={filtered} clients={clients} onUpdate={onUpdate} onDelete={onDelete} userRole={userRole} />
       </div>
 
       {/* Add Modal */}

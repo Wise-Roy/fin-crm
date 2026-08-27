@@ -6,6 +6,7 @@ import { requirePermission } from '../../middleware/authorization.js';
 import { requireRole } from '../../middleware/authorization.js';
 import { PERMISSIONS } from '../../authorization/permissions.js';
 import { notifyRole } from '../notification/notify.js';
+import { validateKycFields, validateEmail, validatePhone } from '../../utils/validators.js';
 
 const router = Router();
 
@@ -82,12 +83,20 @@ router.post(
     const { name, email, phone } = req.body as Record<string, string | undefined>;
     if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
+    const emailErr = validateEmail(email);
+    if (emailErr) { res.status(400).json({ error: emailErr }); return; }
+    const phoneErr = validatePhone(phone);
+    if (phoneErr) { res.status(400).json({ error: phoneErr }); return; }
+
     const kycData: Record<string, unknown> = {};
     const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
     for (const k of kycKeys) {
       const v = (req.body as Record<string, string | undefined>)[k];
       if (v) kycData[k] = v;
     }
+    const kycErrors = validateKycFields(kycData);
+    if (kycErrors.length > 0) { res.status(400).json({ error: kycErrors[0].message, field: kycErrors[0].field }); return; }
+
     const client = await prisma.client.create({
       data: {
         tenant_id: req.tenant!.id,
@@ -142,17 +151,29 @@ router.post(
   },
 );
 
+const KYC_KEYS = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
+
 /** POST /api/clients/:clientId/groups — create client group */
 router.post(
   "/:clientId/groups",
   authenticate,
   async (req: Request, res: Response): Promise<void> => {
     const clientId = req.params.clientId as string;
-    const { group_name, email, phone } = req.body as { group_name?: string; email?: string; phone?: string };
-    if (!group_name || !group_name.trim()) { res.status(400).json({ error: "group_name is required" }); return; }
+    const body = req.body as Record<string, string | boolean | undefined>;
+    const group_name = body.group_name as string | undefined;
+    const email = body.email as string | undefined;
+    const phone = body.phone as string | undefined;
+    const copy_kyc_from_client = body.copy_kyc_from_client as boolean | undefined;
+
+    if (!group_name || !String(group_name).trim()) { res.status(400).json({ error: "group_name is required" }); return; }
+
+    const emailErr = validateEmail(email);
+    if (emailErr) { res.status(400).json({ error: emailErr }); return; }
+    const phoneErr = validatePhone(phone);
+    if (phoneErr) { res.status(400).json({ error: phoneErr }); return; }
 
     const tenantId = req.tenant!.id;
-    const trimmed = group_name.trim();
+    const trimmed = String(group_name).trim();
 
     // Verify client belongs to tenant
     const client = await prisma.client.findFirst({ where: { id: clientId, tenant_id: tenantId } });
@@ -164,6 +185,23 @@ router.post(
     });
     if (existing) { res.json({ group: existing }); return; }
 
+    // Build KYC data: copy from parent client or use provided fields
+    const kycData: Record<string, unknown> = {};
+    if (copy_kyc_from_client) {
+      for (const k of KYC_KEYS) {
+        if ((client as any)[k]) kycData[k] = (client as any)[k];
+      }
+    } else {
+      for (const k of KYC_KEYS) {
+        if (body[k] !== undefined) kycData[k] = body[k] || null;
+      }
+    }
+
+    if (!copy_kyc_from_client) {
+      const kycErrors = validateKycFields(kycData);
+      if (kycErrors.length > 0) { res.status(400).json({ error: kycErrors[0].message, field: kycErrors[0].field }); return; }
+    }
+
     const group = await prisma.client_group.create({
       data: {
         tenant_id: tenantId,
@@ -171,6 +209,7 @@ router.post(
         group_name: trimmed,
         email: email || null,
         phone: phone || null,
+        ...kycData,
       },
     });
     res.status(201).json({ group });
@@ -187,6 +226,10 @@ router.put(
     if (!existing) { res.status(404).json({ error: "Client not found" }); return; }
 
     const body = req.body as Record<string, string | boolean | undefined>;
+
+    if (body.email !== undefined) { const e = validateEmail(body.email as string); if (e) { res.status(400).json({ error: e }); return; } }
+    if (body.phone !== undefined) { const e = validatePhone(body.phone as string); if (e) { res.status(400).json({ error: e }); return; } }
+
     const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
     const data: Record<string, unknown> = { updated_at: new Date() };
     if (body.name !== undefined) data.name = body.name;
@@ -196,6 +239,9 @@ router.put(
     for (const k of kycKeys) {
       if (body[k] !== undefined) data[k] = body[k] || null;
     }
+    const kycErrors = validateKycFields(data);
+    if (kycErrors.length > 0) { res.status(400).json({ error: kycErrors[0].message, field: kycErrors[0].field }); return; }
+
     const client = await prisma.client.update({
       where: { id: req.params.id as string },
       data: data as any,
@@ -274,22 +320,25 @@ router.put(
     });
     if (!group) { res.status(404).json({ error: "Group not found" }); return; }
 
-    const { group_name, email, phone, is_active } = req.body as {
-      group_name?: string;
-      email?: string;
-      phone?: string;
-      is_active?: boolean;
-    };
+    const body = req.body as Record<string, string | boolean | undefined>;
+
+    if (body.email !== undefined) { const e = validateEmail(body.email as string); if (e) { res.status(400).json({ error: e }); return; } }
+    if (body.phone !== undefined) { const e = validatePhone(body.phone as string); if (e) { res.status(400).json({ error: e }); return; } }
+
+    const data: Record<string, unknown> = { updated_at: new Date() };
+    if (body.group_name !== undefined) data.group_name = body.group_name;
+    if (body.email !== undefined) data.email = body.email;
+    if (body.phone !== undefined) data.phone = body.phone;
+    if (body.is_active !== undefined) data.is_active = body.is_active;
+    for (const k of KYC_KEYS) {
+      if (body[k] !== undefined) data[k] = body[k] || null;
+    }
+    const kycErrors = validateKycFields(data);
+    if (kycErrors.length > 0) { res.status(400).json({ error: kycErrors[0].message, field: kycErrors[0].field }); return; }
 
     const updated = await prisma.client_group.update({
       where: { id: req.params.groupId as string },
-      data: {
-        ...(group_name !== undefined && { group_name }),
-        ...(email !== undefined && { email }),
-        ...(phone !== undefined && { phone }),
-        ...(is_active !== undefined && { is_active }),
-        updated_at: new Date(),
-      },
+      data,
     });
     res.json({ group: updated });
   },

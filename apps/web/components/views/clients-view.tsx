@@ -28,7 +28,7 @@ export function ClientsView({
   payments: TaskPayment[];
   onAddClient: (c: Record<string, unknown>) => void;
   onUpdateClient: (id: string, data: Record<string, unknown>) => void;
-  onAddGroup: (clientId: string, groupName: string, email: string, phone: string) => void;
+  onAddGroup: (clientId: string, data: Record<string, unknown>) => void;
   onUpdateGroup: (clientId: string, groupId: string, data: Record<string, unknown>) => void;
   onDeleteGroup: (clientId: string, groupId: string) => void;
   userRole: Role;
@@ -38,6 +38,11 @@ export function ClientsView({
   const [revenue, setRevenue] = useState<ClientRevenue | null>(null);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupEmail, setEditGroupEmail] = useState("");
+  const [editGroupPhone, setEditGroupPhone] = useState("");
+  const [editGroupKyc, setEditGroupKyc] = useState<ClientKyc>({});
+  const [showEditGroupKyc, setShowEditGroupKyc] = useState(false);
+  const [editGroupKycMode, setEditGroupKycMode] = useState<"keep" | "copy" | "custom">("keep");
 
   // Client form
   const [clientForm, setClientForm] = useState({ name: "", email: "", phone: "" });
@@ -54,6 +59,9 @@ export function ClientsView({
   const [groupName, setGroupName] = useState("");
   const [groupEmail, setGroupEmail] = useState("");
   const [groupPhone, setGroupPhone] = useState("");
+  const [groupKyc, setGroupKyc] = useState<ClientKyc>({});
+  const [showGroupKyc, setShowGroupKyc] = useState(false);
+  const [groupKycMode, setGroupKycMode] = useState<"none" | "copy" | "custom">("none");
 
   const filtered = clients;
 
@@ -112,30 +120,116 @@ export function ClientsView({
 
   const submitGroup = () => {
     if (!groupClientId || !groupName.trim() || groupNameErr || groupEmailErr || groupPhoneErr) return;
-    onAddGroup(groupClientId, groupName.trim(), groupEmail.trim(), groupPhone.trim());
+    if (groupKycMode === "custom" && hasKycErrors(groupKyc)) return;
+    const data: Record<string, unknown> = {
+      group_name: groupName.trim(),
+      email: groupEmail.trim() || undefined,
+      phone: groupPhone.trim() || undefined,
+    };
+    if (groupKycMode === "copy") {
+      data.copy_kyc_from_client = true;
+    } else if (groupKycMode === "custom") {
+      for (const [k, v] of Object.entries(groupKyc)) {
+        if (v) data[k] = v;
+      }
+    }
+    onAddGroup(groupClientId, data);
     setGroupName(""); setGroupEmail(""); setGroupPhone(""); setGroupClientId("");
+    setGroupKyc({}); setShowGroupKyc(false); setGroupKycMode("none");
     setAddMode(null);
   };
 
   const [detailGroupName, setDetailGroupName] = useState("");
+  const [detailGroupEmail, setDetailGroupEmail] = useState("");
+  const [detailGroupPhone, setDetailGroupPhone] = useState("");
   const [showDetailAddGroup, setShowDetailAddGroup] = useState(false);
+  const [detailGroupKyc, setDetailGroupKyc] = useState<ClientKyc>({});
+  const [detailGroupKycMode, setDetailGroupKycMode] = useState<"none" | "copy" | "custom">("none");
+  const [showDetailGroupKyc, setShowDetailGroupKyc] = useState(false);
+
+  const detailGroupEmailErr = validateEmail(detailGroupEmail).error;
+  const detailGroupPhoneErr = validatePhone(detailGroupPhone).error;
 
   const submitDetailGroup = () => {
     if (!selectedClient || !detailGroupName.trim()) return;
-    onAddGroup(selectedClient.id, detailGroupName.trim(), "", "");
-    setDetailGroupName("");
+    if (detailGroupEmailErr || detailGroupPhoneErr) return;
+    if (detailGroupKycMode === "custom" && hasKycErrors(detailGroupKyc)) return;
+    const data: Record<string, unknown> = {
+      group_name: detailGroupName.trim(),
+      email: detailGroupEmail.trim() || undefined,
+      phone: detailGroupPhone.trim() || undefined,
+    };
+    if (detailGroupKycMode === "copy") {
+      data.copy_kyc_from_client = true;
+    } else if (detailGroupKycMode === "custom") {
+      for (const [k, v] of Object.entries(detailGroupKyc)) {
+        if (v) data[k] = v;
+      }
+    }
+    onAddGroup(selectedClient.id, data);
+    setDetailGroupName(""); setDetailGroupEmail(""); setDetailGroupPhone("");
+    setDetailGroupKyc({}); setDetailGroupKycMode("none"); setShowDetailGroupKyc(false);
     setShowDetailAddGroup(false);
   };
 
   const startEditGroup = (g: ClientGroup) => {
     setEditingGroup(g.id);
     setEditGroupName(g.group_name);
+    setEditGroupEmail(g.email || "");
+    setEditGroupPhone(g.phone || "");
+    setEditGroupKyc({
+      business_pan: g.business_pan || "",
+      address_line1: g.address_line1 || "",
+      address_line2: g.address_line2 || "",
+      city: g.city || "",
+      state: g.state || "",
+      country: g.country || "India",
+      pincode: g.pincode || "",
+      llpin: g.llpin || "",
+      din: g.din || "",
+      cin: g.cin || "",
+      gst_number: g.gst_number || "",
+      gst_state_code: g.gst_state_code || "",
+      gst_dest_address: g.gst_dest_address || "",
+    });
+    const hasKyc = !!(g.business_pan || g.gst_number || g.din || g.cin || g.llpin);
+    setEditGroupKycMode(hasKyc ? "custom" : "keep");
+    setShowEditGroupKyc(hasKyc);
   };
+
+  const editGroupEmailErr = validateEmail(editGroupEmail).error;
+  const editGroupPhoneErr = validatePhone(editGroupPhone).error;
 
   const saveEditGroup = () => {
     if (!selectedClient || !editingGroup || !editGroupName.trim()) return;
-    onUpdateGroup(selectedClient.id, editingGroup, { group_name: editGroupName.trim() });
+    if (editGroupEmailErr || editGroupPhoneErr) return;
+    if (editGroupKycMode === "custom" && hasKycErrors(editGroupKyc)) return;
+
+    const data: Record<string, unknown> = {
+      group_name: editGroupName.trim(),
+      email: editGroupEmail.trim() || null,
+      phone: editGroupPhone.trim() || null,
+    };
+    if (editGroupKycMode === "copy" && selectedClient) {
+      // Copy KYC from parent client
+      const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
+      for (const k of kycKeys) {
+        data[k] = (selectedClient as any)[k] || null;
+      }
+    } else if (editGroupKycMode === "custom") {
+      for (const [k, v] of Object.entries(editGroupKyc)) {
+        data[k] = v || null;
+      }
+    }
+    onUpdateGroup(selectedClient.id, editingGroup, data);
     setEditingGroup(null);
+    setShowEditGroupKyc(false);
+  };
+
+  const cancelEditGroup = () => {
+    setEditingGroup(null);
+    setShowEditGroupKyc(false);
+    setEditGroupKycMode("keep");
   };
 
   const startEditClient = (c: Client) => {
@@ -243,10 +337,10 @@ export function ClientsView({
           )}
           {addMode === "group" && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden shrink-0">
-              <div className="mx-5 mt-4 mb-2 p-4 bg-gray-50 rounded-xl border border-blue-100 space-y-3">
+              <div className="mx-5 mt-4 mb-2 p-4 bg-gray-50 rounded-xl border border-blue-100 space-y-3 max-h-[60vh] overflow-auto">
                 <p className="text-xs font-semibold text-gray-700">Add Client Group</p>
                 <div className="space-y-2.5">
-                  <select value={groupClientId} onChange={(e) => setGroupClientId(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none">
+                  <select value={groupClientId} onChange={(e) => { setGroupClientId(e.target.value); setGroupKycMode("none"); }} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none">
                     <option value="">Select Client *</option>
                     {clients.filter((c) => c.is_active).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
                   </select>
@@ -254,18 +348,38 @@ export function ClientsView({
                     <input placeholder="Group Name *" value={groupName} onChange={(e) => setGroupName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
                     {groupNameErr && <p className="text-xs text-red-500 mt-0.5">{groupNameErr}</p>}
                   </div>
-                  <div>
-                    <input type="email" placeholder="Group Email" value={groupEmail} onChange={(e) => setGroupEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                    {groupEmailErr && <p className="text-xs text-red-500 mt-0.5">{groupEmailErr}</p>}
-                  </div>
-                  <div>
-                    <input type="tel" placeholder="Group Phone" value={groupPhone} onChange={(e) => setGroupPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                    {groupPhoneErr && <p className="text-xs text-red-500 mt-0.5">{groupPhoneErr}</p>}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <input type="email" placeholder="Group Email" value={groupEmail} onChange={(e) => setGroupEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {groupEmailErr && <p className="text-xs text-red-500 mt-0.5">{groupEmailErr}</p>}
+                    </div>
+                    <div>
+                      <input type="tel" placeholder="Group Phone" value={groupPhone} onChange={(e) => setGroupPhone(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {groupPhoneErr && <p className="text-xs text-red-500 mt-0.5">{groupPhoneErr}</p>}
+                    </div>
                   </div>
                 </div>
+                {/* KYC Mode */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">KYC Details</p>
+                  <div className="flex gap-2">
+                    {(["none", "copy", "custom"] as const).map((mode) => (
+                      <button key={mode} type="button" onClick={() => { setGroupKycMode(mode); setShowGroupKyc(mode === "custom"); if (mode !== "custom") setGroupKyc({}); }}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${groupKycMode === mode ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                        {mode === "none" ? "Skip" : mode === "copy" ? "Copy from Client" : "Custom KYC"}
+                      </button>
+                    ))}
+                  </div>
+                  {groupKycMode === "copy" && groupClientId && (
+                    <p className="text-xs text-blue-600">KYC details will be copied from {clients.find((c) => c.id === groupClientId)?.name || "parent client"}.</p>
+                  )}
+                  {groupKycMode === "custom" && (
+                    <ClientKycForm initial={groupKyc} onChange={setGroupKyc} />
+                  )}
+                </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setAddMode(null)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
-                  <button onClick={submitGroup} disabled={!groupClientId || !groupName.trim()} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">Add Group</button>
+                  <button onClick={() => { setAddMode(null); setShowGroupKyc(false); setGroupKycMode("none"); setGroupKyc({}); }} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
+                  <button onClick={submitGroup} disabled={!groupClientId || !groupName.trim() || (groupKycMode === "custom" && hasKycErrors(groupKyc))} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">Add Group</button>
                 </div>
               </div>
             </motion.div>
@@ -467,11 +581,41 @@ export function ClientsView({
                 <AnimatePresence>
                   {showDetailAddGroup && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mb-3">
-                      <div className="flex gap-2">
-                        <input placeholder="Group name" value={detailGroupName} onChange={(e) => setDetailGroupName(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") submitDetailGroup(); }}
-                          className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                        <button onClick={submitDetailGroup} disabled={!detailGroupName.trim()} className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">Add</button>
+                      <div className="space-y-2.5 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <input placeholder="Group name *" value={detailGroupName} onChange={(e) => setDetailGroupName(e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <input type="email" placeholder="Email" value={detailGroupEmail} onChange={(e) => setDetailGroupEmail(e.target.value)}
+                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                            {detailGroupEmailErr && <p className="text-xs text-red-500 mt-0.5">{detailGroupEmailErr}</p>}
+                          </div>
+                          <div>
+                            <input type="tel" placeholder="Phone" value={detailGroupPhone} onChange={(e) => setDetailGroupPhone(e.target.value)}
+                              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                            {detailGroupPhoneErr && <p className="text-xs text-red-500 mt-0.5">{detailGroupPhoneErr}</p>}
+                          </div>
+                        </div>
+                        {/* KYC Mode */}
+                        <div className="flex gap-1.5">
+                          {(["none", "copy", "custom"] as const).map((mode) => (
+                            <button key={mode} type="button" onClick={() => { setDetailGroupKycMode(mode); setShowDetailGroupKyc(mode === "custom"); if (mode !== "custom") setDetailGroupKyc({}); }}
+                              className={`text-xs px-2 py-1 rounded-md border transition-colors ${detailGroupKycMode === mode ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                              {mode === "none" ? "No KYC" : mode === "copy" ? "Copy from Client" : "Custom KYC"}
+                            </button>
+                          ))}
+                        </div>
+                        {detailGroupKycMode === "copy" && (
+                          <p className="text-xs text-blue-600">KYC copied from {selectedClient.name}.</p>
+                        )}
+                        {detailGroupKycMode === "custom" && (
+                          <ClientKycForm initial={detailGroupKyc} onChange={setDetailGroupKyc} />
+                        )}
+                        <div className="flex gap-2">
+                          <button onClick={() => { setShowDetailAddGroup(false); setDetailGroupKycMode("none"); setDetailGroupKyc({}); }} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100">Cancel</button>
+                          <button onClick={submitDetailGroup} disabled={!detailGroupName.trim() || !!detailGroupEmailErr || !!detailGroupPhoneErr || (detailGroupKycMode === "custom" && hasKycErrors(detailGroupKyc))}
+                            className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 flex-1 disabled:opacity-50">Add Group</button>
+                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -484,28 +628,112 @@ export function ClientsView({
                     groups.map((g) => {
                       const groupTasks = tasks.filter((t) => t.client_group_id === g.id);
                       const isEditing = editingGroup === g.id;
-                      return (
-                        <div key={g.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 group/grp">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <Users size={11} className="text-gray-400 shrink-0" />
-                            {isEditing ? (
-                              <input value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") saveEditGroup(); if (e.key === "Escape") setEditingGroup(null); }}
-                                onBlur={saveEditGroup} autoFocus
-                                className="flex-1 border border-gray-200 rounded px-1.5 py-0.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                            ) : (
-                              <span className="text-xs font-medium text-gray-700 truncate">{g.group_name}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400 ">{groupTasks.length} tasks</span>
-                            {canEdit && !isEditing && (
-                              <div className="flex items-center gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
-                                <button onClick={() => startEditGroup(g)} className="text-gray-400 hover:text-gray-700"><Edit3 size={10} /></button>
-                                <button onClick={() => onDeleteGroup(selectedClient.id, g.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={10} /></button>
+                      const hasGroupKyc = !!(g.business_pan || g.gst_number || g.din || g.cin || g.llpin);
+
+                      if (isEditing) {
+                        return (
+                          <div key={g.id} className="bg-white rounded-lg p-3 border border-gray-200 space-y-2.5">
+                            <p className="text-xs font-semibold text-gray-700">Edit Group</p>
+                            <div>
+                              <input placeholder="Group Name *" value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)} autoFocus
+                                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <input type="email" placeholder="Email" value={editGroupEmail} onChange={(e) => setEditGroupEmail(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                                {editGroupEmailErr && <p className="text-xs text-red-500 mt-0.5">{editGroupEmailErr}</p>}
                               </div>
-                            )}
+                              <div>
+                                <input type="tel" placeholder="Phone" value={editGroupPhone} onChange={(e) => setEditGroupPhone(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                                {editGroupPhoneErr && <p className="text-xs text-red-500 mt-0.5">{editGroupPhoneErr}</p>}
+                              </div>
+                            </div>
+                            {/* KYC Edit */}
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">KYC Details</p>
+                              <div className="flex gap-1.5">
+                                {(["keep", "copy", "custom"] as const).map((mode) => (
+                                  <button key={mode} type="button" onClick={() => {
+                                    setEditGroupKycMode(mode);
+                                    setShowEditGroupKyc(mode === "custom");
+                                    if (mode === "copy") {
+                                      // Preview: fill KYC from parent
+                                      setEditGroupKyc({
+                                        business_pan: selectedClient.business_pan || "",
+                                        address_line1: selectedClient.address_line1 || "",
+                                        address_line2: selectedClient.address_line2 || "",
+                                        city: selectedClient.city || "",
+                                        state: selectedClient.state || "",
+                                        country: selectedClient.country || "India",
+                                        pincode: selectedClient.pincode || "",
+                                        llpin: selectedClient.llpin || "",
+                                        din: selectedClient.din || "",
+                                        cin: selectedClient.cin || "",
+                                        gst_number: selectedClient.gst_number || "",
+                                        gst_state_code: selectedClient.gst_state_code || "",
+                                        gst_dest_address: selectedClient.gst_dest_address || "",
+                                      });
+                                      setShowEditGroupKyc(true);
+                                    }
+                                  }}
+                                    className={`text-xs px-2 py-1 rounded-md border transition-colors ${editGroupKycMode === mode ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                    {mode === "keep" ? "Keep Current" : mode === "copy" ? "Copy from Client" : "Edit KYC"}
+                                  </button>
+                                ))}
+                              </div>
+                              {showEditGroupKyc && (
+                                <ClientKycForm initial={editGroupKyc} onChange={setEditGroupKyc} />
+                              )}
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button onClick={cancelEditGroup} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100">Cancel</button>
+                              <button onClick={saveEditGroup} disabled={!editGroupName.trim() || !!editGroupEmailErr || !!editGroupPhoneErr || (showEditGroupKyc && hasKycErrors(editGroupKyc))}
+                                className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 flex-1 disabled:opacity-50">Save</button>
+                            </div>
                           </div>
+                        );
+                      }
+
+                      return (
+                        <div key={g.id} className="bg-gray-50 rounded-lg px-3 py-2.5 group/grp">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <Users size={11} className="text-gray-400 shrink-0" />
+                              <span className="text-xs font-medium text-gray-700 truncate">{g.group_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-400">{groupTasks.length} tasks</span>
+                              {canEdit && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
+                                  <button onClick={() => startEditGroup(g)} className="text-gray-400 hover:text-gray-700"><Edit3 size={10} /></button>
+                                  <button onClick={() => onDeleteGroup(selectedClient.id, g.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={10} /></button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {(g.email || g.phone) && (
+                            <div className="mt-1 pl-5 flex gap-3">
+                              {g.email && <span className="text-xs text-gray-400">{g.email}</span>}
+                              {g.phone && <span className="text-xs text-gray-400">{g.phone}</span>}
+                            </div>
+                          )}
+                          {hasGroupKyc && (
+                            <div className="mt-1.5 pl-5 grid grid-cols-2 gap-x-3 gap-y-0.5">
+                              {([
+                                ["PAN", g.business_pan],
+                                ["GSTIN", g.gst_number],
+                                ["DIN", g.din],
+                                ["CIN", g.cin],
+                                ["LLPIN", g.llpin],
+                              ] as const).filter(([, v]) => v).map(([l, v]) => (
+                                <div key={l} className="text-xs text-gray-500">
+                                  <span className="text-gray-400">{l}:</span> <span className="font-mono">{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })

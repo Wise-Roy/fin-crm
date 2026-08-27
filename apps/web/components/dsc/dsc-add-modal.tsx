@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, AlertCircle } from "lucide-react";
 import { motion } from "motion/react";
 import type { Client } from "@/lib/types";
+import { validatePAN, validatePhone } from "@/lib/validations";
 
 interface DscAddModalProps {
   open: boolean;
@@ -62,14 +63,14 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
     onClose();
   };
 
+  const panErr = validatePAN(panNumber).error;
+  const phoneErr = validatePhone(mobileNumber).error;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(panNumber.toUpperCase())) {
-      setError("Invalid PAN number format (e.g. ABCDE1234F)");
-      return;
-    }
+    if (panErr || phoneErr) return;
 
     setLoading(true);
     try {
@@ -140,6 +141,7 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
                   maxLength={10}
                   className={`${inputCls} font-mono uppercase`}
                 />
+                {panErr && <p className="text-xs text-red-500 mt-0.5">{panErr}</p>}
               </div>
               <div>
                 <label className={labelCls}>Name (on DSC) *</label>
@@ -218,7 +220,8 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Mobile Number</label>
-                <input type="tel" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value)} placeholder="10-digit mobile" maxLength={10} className={inputCls} />
+                <input type="tel" value={mobileNumber} onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ""))} placeholder="10-digit mobile" maxLength={10} className={inputCls} />
+                {phoneErr && <p className="text-xs text-red-500 mt-0.5">{phoneErr}</p>}
               </div>
               <div />
             </div>
@@ -236,7 +239,7 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !!panErr || !!phoneErr}
                 className="px-5 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-60 flex items-center gap-2"
               >
                 {loading && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}

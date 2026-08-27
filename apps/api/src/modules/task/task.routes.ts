@@ -16,6 +16,14 @@ const TASK_INCLUDES = {
   sub_categories: { select: { id: true, name: true } },
 } as const;
 
+/** Role hierarchy: which roles each role can assign to */
+const ASSIGNABLE_ROLES: Record<string, string[]> = {
+  OWNER: ["ADMIN", "MANAGER", "EMPLOYEE"],
+  ADMIN: ["MANAGER", "EMPLOYEE"],
+  MANAGER: ["EMPLOYEE"],
+  EMPLOYEE: [],
+};
+
 /** GET /api/tasks/my — tasks assigned to me */
 router.get("/my", authenticate, async (req: Request, res: Response): Promise<void> => {
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -143,12 +151,13 @@ router.post(
   authenticate,
   requirePermission(PERMISSIONS.TASK_CREATE),
   async (req: Request, res: Response): Promise<void> => {
-    const { title, description, client_id, assigned_to_employee_id, priority, due_date, category_id, subcategory_id, client_group_id } = req.body as {
+    const { title, description, client_id, assigned_to_employee_id, priority, effort, due_date, category_id, subcategory_id, client_group_id } = req.body as {
       title?: string;
       description?: string;
       client_id?: string;
       assigned_to_employee_id?: string;
       priority?: string;
+      effort?: string;
       due_date?: string;
       category_id?: string;
       subcategory_id?: string;
@@ -156,6 +165,17 @@ router.post(
     };
 
     if (!title) { res.status(400).json({ error: "title is required" }); return; }
+
+    // Validate assignee role hierarchy
+    if (assigned_to_employee_id) {
+      const assignee = await prisma.user.findFirst({ where: { id: assigned_to_employee_id, tenantId: req.tenant!.id } });
+      if (!assignee) { res.status(404).json({ error: "Assignee not found" }); return; }
+      const allowed = ASSIGNABLE_ROLES[req.user!.role] ?? [];
+      if (!allowed.includes(assignee.role)) {
+        res.status(403).json({ error: "You cannot assign tasks to a user with that role" });
+        return;
+      }
+    }
 
     const task = await prisma.task.create({
       data: {
@@ -166,6 +186,7 @@ router.post(
         assigned_to_employee_id: assigned_to_employee_id || null,
         created_by: req.user!.id,
         priority: (priority as any) || "MEDIUM",
+        effort: effort ? (effort as any) : null,
         status: "TODO",
         due_date: due_date ? new Date(due_date) : null,
         category_id: category_id || null,
@@ -203,13 +224,21 @@ router.post(
 router.patch(
   "/:id/status",
   authenticate,
-  requirePermission(PERMISSIONS.TASK_UPDATE),
   async (req: Request, res: Response): Promise<void> => {
     const { status } = req.body as { status?: string };
     if (!status) { res.status(400).json({ error: "status is required" }); return; }
 
     const existing = await prisma.task.findFirst({ where: { id: req.params.id as string, tenant_id: req.tenant!.id } });
     if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
+
+    // EMPLOYEE can only update status of their own assigned tasks
+    const userRole = req.user!.role;
+    if (userRole === "EMPLOYEE") {
+      if (existing.assigned_to_employee_id !== req.user!.id) {
+        res.status(403).json({ error: "You can only update status of tasks assigned to you" });
+        return;
+      }
+    }
 
     const data: Record<string, unknown> = { status, updated_at: new Date() };
     if (status === "COMPLETED") data.completed_at = new Date();
@@ -233,29 +262,30 @@ router.patch(
       }),
     ]);
 
-    // Notify task creator and assignee about status change
-    const statusLabel = (status as string).replace(/_/g, " ").toLowerCase();
-    const targets = new Set<string>();
-    if (task.created_by && task.created_by !== req.user!.id) targets.add(task.created_by);
-    if (task.assigned_to_employee_id && task.assigned_to_employee_id !== req.user!.id) targets.add(task.assigned_to_employee_id);
-    targets.forEach((uid) => {
-      notify({
-        tenantId: req.tenant!.id,
-        userId: uid,
-        title: "Task Status Updated",
-        message: `"${task.title}" moved to ${statusLabel} by ${req.user!.name}`,
-        taskId: task.id,
+    // Only notify when task is marked COMPLETED
+    if (status === "COMPLETED") {
+      const notified = new Set<string>();
+      notified.add(req.user!.id); // don't notify the person who made the change
+
+      // Notify creator and assignee
+      if (task.created_by && !notified.has(task.created_by)) {
+        notify({ tenantId: req.tenant!.id, userId: task.created_by, title: "Task Completed", message: `"${task.title}" marked as completed by ${req.user!.name}`, taskId: task.id });
+        notified.add(task.created_by);
+      }
+      if (task.assigned_to_employee_id && !notified.has(task.assigned_to_employee_id)) {
+        notify({ tenantId: req.tenant!.id, userId: task.assigned_to_employee_id, title: "Task Completed", message: `"${task.title}" marked as completed by ${req.user!.name}`, taskId: task.id });
+        notified.add(task.assigned_to_employee_id);
+      }
+
+      // Notify owners not already notified
+      const owners = await prisma.user.findMany({
+        where: { tenantId: req.tenant!.id, role: "OWNER" as any, is_active: true, id: { notIn: [...notified] } },
+        select: { id: true },
       });
-    });
-    // Notify owner
-    notifyRole({
-      tenantId: req.tenant!.id,
-      roles: ["OWNER"],
-      title: "Task Status Updated",
-      message: `"${task.title}" moved to ${statusLabel} by ${req.user!.name}`,
-      taskId: task.id,
-      excludeUserId: req.user!.id,
-    });
+      for (const o of owners) {
+        notify({ tenantId: req.tenant!.id, userId: o.id, title: "Task Completed", message: `"${task.title}" marked as completed by ${req.user!.name}`, taskId: task.id });
+      }
+    }
 
     res.json({ task });
   },
@@ -303,11 +333,43 @@ router.patch(
     const existing = await prisma.task.findFirst({ where: { id: req.params.id as string, tenant_id: req.tenant!.id } });
     if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
 
+    // Validate role hierarchy
+    const assignee = await prisma.user.findFirst({ where: { id: assigned_to_employee_id, tenantId: req.tenant!.id } });
+    if (!assignee) { res.status(404).json({ error: "Assignee not found" }); return; }
+    const allowed = ASSIGNABLE_ROLES[req.user!.role] ?? [];
+    if (!allowed.includes(assignee.role)) {
+      res.status(403).json({ error: "You cannot assign tasks to a user with that role" });
+      return;
+    }
+
     const task = await prisma.task.update({
       where: { id: req.params.id as string },
       data: { assigned_to_employee_id, updated_at: new Date() },
       include: TASK_INCLUDES,
     });
+
+    // Notify new assignee
+    if (assigned_to_employee_id !== req.user!.id) {
+      notify({
+        tenantId: req.tenant!.id,
+        userId: assigned_to_employee_id,
+        title: "Task Reassigned to You",
+        message: `"${task.title}" has been assigned to you by ${req.user!.name}`,
+        taskId: task.id,
+      });
+    }
+
+    // Notify previous assignee that task was reassigned away
+    if (existing.assigned_to_employee_id && existing.assigned_to_employee_id !== assigned_to_employee_id && existing.assigned_to_employee_id !== req.user!.id) {
+      notify({
+        tenantId: req.tenant!.id,
+        userId: existing.assigned_to_employee_id,
+        title: "Task Reassigned",
+        message: `"${task.title}" has been reassigned to someone else by ${req.user!.name}`,
+        taskId: task.id,
+      });
+    }
+
     res.json({ task });
   },
 );

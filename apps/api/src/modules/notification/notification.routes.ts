@@ -18,25 +18,23 @@ router.get("/", authenticate, async (req: Request, res: Response): Promise<void>
   res.json({ data });
 });
 
-/** PATCH /api/notifications/mark-all-read */
+/** PATCH /api/notifications/mark-all-read — delete all read notifications */
 router.patch("/mark-all-read", authenticate, async (req: Request, res: Response): Promise<void> => {
-  await prisma.notifications.updateMany({
-    where: { user_id: req.user!.id, tenant_id: req.tenant!.id, is_read: false },
-    data: { is_read: true },
+  await prisma.notifications.deleteMany({
+    where: { user_id: req.user!.id, tenant_id: req.tenant!.id },
   });
   res.json({ success: true });
 });
 
-/** PATCH /api/notifications/:id/read */
+/** PATCH /api/notifications/:id/read — delete single notification */
 router.patch("/:id/read", authenticate, async (req: Request, res: Response): Promise<void> => {
   const notif = await prisma.notifications.findFirst({
     where: { id: req.params.id as string, user_id: req.user!.id },
   });
   if (!notif) { res.status(404).json({ error: "Notification not found" }); return; }
 
-  await prisma.notifications.update({
+  await prisma.notifications.delete({
     where: { id: req.params.id as string },
-    data: { is_read: true },
   });
   res.json({ success: true });
 });

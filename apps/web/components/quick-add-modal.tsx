@@ -3,8 +3,9 @@
 import { useState, useMemo } from "react";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Client, TeamMember, Priority, Category } from "@/lib/types";
+import type { Client, TeamMember, Priority, Category, Role } from "@/lib/types";
 import { api } from "@/lib/api";
+import { can, getAssignableMembers } from "@/lib/utils";
 import { Combobox } from "@/components/combobox";
 
 // Flattened option for client dropdown: either a bare client or a client_group under a client
@@ -47,6 +48,7 @@ export function QuickAddModal({
   clients,
   onClientsChange,
   teamMembers,
+  userRole,
   categories,
   onCategoriesChange,
   onAdd,
@@ -56,6 +58,7 @@ export function QuickAddModal({
   clients: Client[];
   onClientsChange: (c: Client[]) => void;
   teamMembers: TeamMember[];
+  userRole: Role;
   categories: Category[];
   onCategoriesChange: (cats: Category[]) => void;
   onAdd: (data: {
@@ -64,6 +67,7 @@ export function QuickAddModal({
     client_group_id?: string;
     assigned_to_employee_id?: string;
     priority: string;
+    effort?: string;
     due_date: string;
     category_id?: string;
     subcategory_id?: string;
@@ -73,6 +77,7 @@ export function QuickAddModal({
   const [clientKey, setClientKey] = useState(""); // "client:<id>" or "group:<id>"
   const [assignedTo, setAssignedTo] = useState("");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
+  const [effort, setEffort] = useState("");
   const [dueDate, setDueDate] = useState("");
 
   // Category/subcategory: track selected ID OR pending-new name
@@ -83,6 +88,7 @@ export function QuickAddModal({
 
   const [submitting, setSubmitting] = useState(false);
 
+  const assignableMembers = getAssignableMembers(teamMembers, userRole);
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const subcategories = selectedCategory?.sub_categories ?? [];
 
@@ -93,6 +99,7 @@ export function QuickAddModal({
     setClientKey("");
     setAssignedTo("");
     setPriority("MEDIUM");
+    setEffort("");
     setDueDate("");
     setCategoryId("");
     setNewCategoryName("");
@@ -120,28 +127,30 @@ export function QuickAddModal({
       // Resolve category — create if new
       let finalCategoryId = categoryId || undefined;
       let finalSubcategoryId = subcategoryId || undefined;
+      let updatedCategories = [...categories];
 
       if (newCategoryName && !categoryId) {
         const { category } = await api.categories.create(newCategoryName);
         finalCategoryId = category.id;
-        // Update parent categories list
-        const exists = categories.some((c) => c.id === category.id);
+        // Update local tracking + parent categories list
+        const exists = updatedCategories.some((c) => c.id === category.id);
         if (!exists) {
-          onCategoriesChange([...categories, { ...category, sub_categories: category.sub_categories ?? [] }]);
+          const newCat = { ...category, sub_categories: category.sub_categories ?? [] };
+          updatedCategories = [...updatedCategories, newCat];
+          onCategoriesChange(updatedCategories);
         }
       }
 
       if (newSubcategoryName && !subcategoryId && finalCategoryId) {
         const { subcategory } = await api.categories.createSubcategory(finalCategoryId, newSubcategoryName);
         finalSubcategoryId = subcategory.id;
-        // Update parent categories list
-        onCategoriesChange(
-          categories.map((c) =>
-            c.id === finalCategoryId
-              ? { ...c, sub_categories: [...c.sub_categories, subcategory] }
-              : c
-          )
+        // Update using tracked list (not stale closure)
+        updatedCategories = updatedCategories.map((c) =>
+          c.id === finalCategoryId
+            ? { ...c, sub_categories: [...c.sub_categories, subcategory] }
+            : c
         );
+        onCategoriesChange(updatedCategories);
       }
 
       const { client_id, client_group_id } = resolveClient();
@@ -152,6 +161,7 @@ export function QuickAddModal({
         client_group_id,
         assigned_to_employee_id: assignedTo || undefined,
         priority,
+        effort: effort || undefined,
         due_date: dueDate || undefined as any,
         category_id: finalCategoryId,
         subcategory_id: finalSubcategoryId,
@@ -301,25 +311,27 @@ export function QuickAddModal({
                   placeholder="Search client or group…"
                 />
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
-                    Assign To
-                  </label>
-                  <select
-                    value={assignedTo}
-                    onChange={(e) => setAssignedTo(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
-                  >
-                    <option value="">Unassigned</option>
-                    {teamMembers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} — {m.position || m.role}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {can(userRole, "assign_task") && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                      Assign To
+                    </label>
+                    <select
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
+                    >
+                      <option value="">Unassigned</option>
+                      {assignableMembers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} — {m.position || m.role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
                       Priority
@@ -333,6 +345,21 @@ export function QuickAddModal({
                       <option value="MEDIUM">Medium</option>
                       <option value="HIGH">High</option>
                       <option value="URGENT">Urgent</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                      Effort
+                    </label>
+                    <select
+                      value={effort}
+                      onChange={(e) => setEffort(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
+                    >
+                      <option value="XS">XS (1 hr)</option>
+                      <option value="S">S (3 hrs)</option>
+                      <option value="M">M (5 hrs)</option>
+                      <option value="L">L (1 day)</option>
                     </select>
                   </div>
                   <div>

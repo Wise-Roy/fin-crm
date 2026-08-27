@@ -104,12 +104,30 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+
+  // Refresh categories + clients when quick-add modal opens
+  useEffect(() => {
+    if (!showAddTask) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [catRes, clientRes] = await Promise.all([
+          api.categories.list(),
+          api.clients.list({ limit: "100" }),
+        ]);
+        if (cancelled) return;
+        setCategories(catRes.data);
+        setClients(clientRes.data);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [showAddTask]);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   const userRole = appUser?.role || "EMPLOYEE";
   const userInitials = appUser?.initials || getInitials(appUser?.name || "??");
 
-  const unread = notifs.filter((n) => !n.is_read).length;
+  const unread = notifs.length;
   const activeTaskCount = tasks.filter((t) => t.status !== "COMPLETED" && t.status !== "CANCELLED").length;
   const pendingReimbCount = reimbs.filter((r) => r.status === "PENDING").length;
 
@@ -186,9 +204,16 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     } catch (err) { console.error("Failed to update task status:", err); }
   }, []);
 
+  const handleAssignTask = useCallback(async (id: string, assigneeId: string) => {
+    try {
+      const { task } = await api.tasks.assign(id, assigneeId);
+      setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+    } catch (err) { console.error("Failed to assign task:", err); }
+  }, []);
+
   const handleAddTask = useCallback(async (data: {
     title: string; client_id?: string; client_group_id?: string;
-    assigned_to_employee_id?: string; priority: string; due_date: string;
+    assigned_to_employee_id?: string; priority: string; effort?: string; due_date: string;
     category_id?: string; subcategory_id?: string;
   }) => {
     try {
@@ -242,6 +267,16 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   }) => {
     const { dsc } = await api.dsc.create(data);
     setDscEntries((prev) => [dsc, ...prev]);
+  }, []);
+
+  const handleUpdateDsc = useCallback(async (id: string, data: Record<string, unknown>) => {
+    try {
+      const { dsc } = await api.dsc.update(id, data);
+      setDscEntries((prev) => prev.map((d) => (d.id === id ? dsc : d)));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to update DSC";
+      alert(msg);
+    }
   }, []);
 
   const handleDeleteDsc = useCallback(async (id: string) => {
@@ -331,9 +366,9 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     if (!allowedViews.includes(view)) setView("dashboard");
   }, [view, allowedViews]);
 
-  const handleAddGroup = useCallback(async (clientId: string, groupName: string, email: string, phone: string) => {
+  const handleAddGroup = useCallback(async (clientId: string, data: Record<string, unknown>) => {
     try {
-      const { group } = await api.clients.createGroup(clientId, { group_name: groupName, email, phone });
+      const { group } = await api.clients.createGroup(clientId, data);
       setClients((prev) => prev.map((c) => c.id === clientId ? { ...c, client_group: [...(c.client_group || []), group] } : c));
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to create group";
@@ -556,11 +591,11 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 onClose={() => setShowNotifs(false)}
                 notifications={notifs}
                 onMarkAll={() => {
-                  setNotifs((p) => p.map((n) => ({ ...n, is_read: true })));
+                  setNotifs([]);
                   api.notifications.markAllRead().catch(() => {});
                 }}
                 onMarkSelected={(ids) => {
-                  setNotifs((p) => p.map((n) => ids.includes(n.id) ? { ...n, is_read: true } : n));
+                  setNotifs((p) => p.filter((n) => !ids.includes(n.id)));
                   ids.forEach((id) => api.notifications.markRead(id).catch(() => {}));
                 }}
               />
@@ -657,7 +692,8 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 />
               )}
               {view === "tasks" && (
-                <TasksView tasks={tasks} payments={payments} onStatusChange={handleTaskStatusChange}
+                <TasksView tasks={tasks} payments={payments} teamMembers={teamMembers}
+                  onStatusChange={handleTaskStatusChange} onAssignTask={handleAssignTask}
                   onAddTask={() => setShowAddTask(true)} onCreatePayment={handleCreatePayment}
                   onMarkPaymentPaid={handleMarkPaymentPaid} onDeletePayment={handleDeletePayment} userRole={userRole} />
               )}
@@ -677,6 +713,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   entries={dscEntries}
                   clients={clients}
                   onAdd={handleAddDsc}
+                  onUpdate={handleUpdateDsc}
                   onDelete={handleDeleteDsc}
                   userRole={userRole}
                   dateRange={dateRange}
@@ -704,7 +741,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       <QuickAddModal
         open={showAddTask} onClose={() => setShowAddTask(false)}
         clients={clients} onClientsChange={setClients} teamMembers={teamMembers}
-        categories={categories} onCategoriesChange={setCategories} onAdd={handleAddTask}
+        userRole={userRole} categories={categories} onCategoriesChange={setCategories} onAdd={handleAddTask}
       />
 
       <AnimatePresence>

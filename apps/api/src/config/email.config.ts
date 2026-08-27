@@ -1,6 +1,13 @@
-import { Resend } from 'resend';
+import { BrevoClient } from "@getbrevo/brevo";
 
-const resend = new Resend(process.env.RESEND_API_KEY as string);
+const brevo = new BrevoClient({
+  apiKey: process.env.BREVO_API_KEY as string,
+});
+
+const DEFAULT_SENDER = {
+  name: process.env.BREVO_SENDER_NAME || "FinCRM",
+  email: (process.env.BREVO_SENDER_EMAIL || "p.gadiya177@gmail.com").trim(),
+};
 
 export async function sendEmail({
   to,
@@ -11,6 +18,21 @@ export async function sendEmail({
   subject: string;
   html: string;
 }) {
-  const from = (process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
-  return resend.emails.send({ from, to, subject, html });
+  try {
+    const result = await brevo.transactionalEmails.sendTransacEmail({
+      sender: DEFAULT_SENDER,
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    });
+
+    return result;
+  } catch (error: any) {
+    console.error("Brevo email error:", {
+      message: error?.message,
+      statusCode: error?.statusCode,
+      body: error?.body,
+    });
+    throw error;
+  }
 }

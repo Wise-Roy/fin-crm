@@ -76,6 +76,7 @@ export interface Task {
   created_by: string;
   status: TaskStatus;
   priority: Priority;
+  effort?: "XS" | "S" | "M" | "L" | null;
   due_date?: string | null;
   completed_at?: string | null;
   created_at: string;
@@ -88,7 +89,7 @@ export interface Task {
   sub_categories?: { id: string; name: string } | null;
 }
 
-export interface ClientGroup {
+export interface ClientGroup extends ClientKyc {
   id: string;
   tenant_id: string;
   client_id: string;

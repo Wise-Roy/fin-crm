@@ -3,15 +3,17 @@
 import { useState, useMemo } from "react";
 import { Plus, Lock, X, IndianRupee, History, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import type { Task, TaskStatus, TaskPayment, TaskHistory, Role } from "@/lib/types";
-import { STATUS_CFG, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials } from "@/lib/utils";
+import type { Task, TaskStatus, TaskPayment, TaskHistory, Role, TeamMember } from "@/lib/types";
+import { STATUS_CFG, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials, getAssignableMembers } from "@/lib/utils";
 import { StatusBadge, PriorityDot, Av } from "@/components/ui-atoms";
 import { api } from "@/lib/api";
 
 export function TasksView({
   tasks,
   payments,
+  teamMembers,
   onStatusChange,
+  onAssignTask,
   onAddTask,
   onCreatePayment,
   onMarkPaymentPaid,
@@ -20,7 +22,9 @@ export function TasksView({
 }: {
   tasks: Task[];
   payments: TaskPayment[];
+  teamMembers: TeamMember[];
   onStatusChange: (id: string, s: TaskStatus) => void;
+  onAssignTask: (id: string, assigneeId: string) => void;
   onAddTask: () => void;
   onCreatePayment: (data: { task_id: string; payment_type: string; amount: number }) => void;
   onMarkPaymentPaid: (id: string) => void;
@@ -231,17 +235,40 @@ export function TasksView({
             <div className="flex-1 overflow-auto p-5 space-y-5">
               {/* Task Info */}
               <div className="grid grid-cols-2 gap-3">
-                {([
-                  ["Client", selectedTask.client?.name || "\u2014"],
-                  ["Assignee", selectedTask.users_task_assigned_to_employee_idTousers?.name || "\u2014"],
-                  ["Due", selectedTask.due_date ? fmtDate(selectedTask.due_date) : "\u2014"],
-                  ["Created", fmtDate(selectedTask.created_at)],
-                ] as const).map(([l, v]) => (
-                  <div key={l}>
-                    <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">{l}</div>
-                    <div className="text-xs font-medium text-gray-800 truncate">{v}</div>
-                  </div>
-                ))}
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Client</div>
+                  <div className="text-xs font-medium text-gray-800 truncate">{selectedTask.client?.name || "\u2014"}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Assignee</div>
+                  {can(userRole, "assign_task") ? (
+                    <select
+                      value={selectedTask.assigned_to_employee_id || ""}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          onAssignTask(selectedTask.id, e.target.value);
+                          setSelectedTask({ ...selectedTask, assigned_to_employee_id: e.target.value, users_task_assigned_to_employee_idTousers: teamMembers.find((m) => m.id === e.target.value) ? { id: e.target.value, name: teamMembers.find((m) => m.id === e.target.value)!.name, email: teamMembers.find((m) => m.id === e.target.value)!.email } : selectedTask.users_task_assigned_to_employee_idTousers });
+                        }
+                      }}
+                      className="w-full text-xs font-medium text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none cursor-pointer"
+                    >
+                      <option value="">Unassigned</option>
+                      {getAssignableMembers(teamMembers, userRole).map((m) => (
+                        <option key={m.id} value={m.id}>{m.name} — {m.position || m.role}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-xs font-medium text-gray-800 truncate">{selectedTask.users_task_assigned_to_employee_idTousers?.name || "\u2014"}</div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Due</div>
+                  <div className="text-xs font-medium text-gray-800 truncate">{selectedTask.due_date ? fmtDate(selectedTask.due_date) : "\u2014"}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Created</div>
+                  <div className="text-xs font-medium text-gray-800 truncate">{fmtDate(selectedTask.created_at)}</div>
+                </div>
               </div>
 
               {/* Payments Section */}

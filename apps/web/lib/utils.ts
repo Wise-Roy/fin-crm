@@ -95,7 +95,7 @@ export const ROLE_BADGE: Record<Role, string> = {
   EMPLOYEE: "bg-amber-50 text-amber-700",
 };
 
-type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member" | "edit_client" | "import_data";
+type Action = "add_task" | "add_client" | "add_dsc" | "approve_reimb" | "manage_team" | "see_all" | "view_requests" | "manage_payments" | "mark_payment_done" | "view_revenue" | "view_analytics" | "view_settings" | "view_client_details" | "view_employee_performance" | "add_member" | "edit_client" | "import_data" | "assign_task";
 
 export const can = (role: Role, action: Action): boolean => {
   switch (action) {
@@ -146,9 +146,29 @@ export const can = (role: Role, action: Action): boolean => {
     // Only OWNER can view employee performance in analytics
     case "view_employee_performance":
       return role === "OWNER";
+    // OWNER, ADMIN, MANAGER can assign; EMPLOYEE cannot
+    case "assign_task":
+      return (["OWNER", "ADMIN", "MANAGER"] as Role[]).includes(role);
     default:
       return false;
   }
+};
+
+/** Roles that a given role can assign tasks to */
+const ASSIGNABLE_ROLES: Record<Role, Role[]> = {
+  OWNER: ["ADMIN", "MANAGER", "EMPLOYEE"],
+  ADMIN: ["MANAGER", "EMPLOYEE"],
+  MANAGER: ["EMPLOYEE"],
+  EMPLOYEE: [],
+};
+
+/** Filter team members to those the current role can assign to */
+export const getAssignableMembers = <T extends { role: Role; is_active: boolean }>(
+  members: T[],
+  currentRole: Role,
+): T[] => {
+  const allowed = ASSIGNABLE_ROLES[currentRole] ?? [];
+  return members.filter((m) => m.is_active && allowed.includes(m.role));
 };
 
 export const fmtINR = (n: number) =>

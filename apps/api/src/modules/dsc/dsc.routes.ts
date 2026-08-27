@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { prisma as _prisma } from "@repo/db";
 import { authenticate } from "../../middleware/auth.js";
 import { notifyRole } from "../notification/notify.js";
+import { validatePAN, validatePhone } from "../../utils/validators.js";
 
 // Cast needed until migration runs and Prisma adapter types refresh
 const prisma = _prisma as any;
@@ -67,9 +68,13 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
   }
 
   // Validate PAN format
-  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan_number)) {
-    res.status(400).json({ error: "Invalid PAN number format" });
-    return;
+  const panErr = validatePAN(pan_number);
+  if (panErr) { res.status(400).json({ error: panErr }); return; }
+
+  // Validate mobile number if provided
+  if (mobile_number) {
+    const phoneErr = validatePhone(mobile_number);
+    if (phoneErr) { res.status(400).json({ error: phoneErr }); return; }
   }
 
   // Validate client belongs to tenant if provided
@@ -127,11 +132,13 @@ router.put("/:id", authenticate, async (req: Request, res: Response): Promise<vo
   const updateData: Record<string, unknown> = { updated_at: new Date() };
 
   if (pan_number !== undefined) {
-    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan_number)) {
-      res.status(400).json({ error: "Invalid PAN number format" });
-      return;
-    }
+    const panErr = validatePAN(pan_number);
+    if (panErr) { res.status(400).json({ error: panErr }); return; }
     updateData.pan_number = pan_number;
+  }
+  if (mobile_number !== undefined && mobile_number) {
+    const phoneErr = validatePhone(mobile_number);
+    if (phoneErr) { res.status(400).json({ error: phoneErr }); return; }
   }
   if (name !== undefined) updateData.name = name;
   if (related_company !== undefined) updateData.related_company = related_company;
