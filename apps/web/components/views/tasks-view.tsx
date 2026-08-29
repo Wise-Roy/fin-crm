@@ -288,7 +288,7 @@ export function TasksView({
                     onClick={() => {
                       setEditMode(true);
                       setEditTitle(selectedTask.title);
-                      setEditDueDate(selectedTask.due_date ? selectedTask.due_date.split("T")[0] : "");
+                      setEditDueDate(selectedTask.due_date ? selectedTask.due_date.split("T")[0] ?? "" : "");
                       setEditPriority(selectedTask.priority);
                     }}
                     className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors"
