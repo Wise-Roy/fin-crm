@@ -211,6 +211,18 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     }
   }, []);
 
+  const handleUpdateTask = useCallback(async (id: string, data: Record<string, unknown>) => {
+    const { task } = await api.tasks.update(id, data);
+    setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
+  }, []);
+
+  const handleDeleteTask = useCallback(async (id: string) => {
+    try {
+      await api.tasks.delete(id);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    } catch (err) { console.error("Failed to delete task:", err); }
+  }, []);
+
   const handleAssignTask = useCallback(async (id: string, assigneeId: string) => {
     try {
       const { task } = await api.tasks.assign(id, assigneeId);
@@ -694,7 +706,8 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 <TasksView tasks={tasks} payments={payments} teamMembers={teamMembers}
                   onStatusChange={handleTaskStatusChange} onAssignTask={handleAssignTask}
                   onAddTask={() => setShowAddTask(true)} onCreatePayment={handleCreatePayment}
-                  onMarkPaymentPaid={handleMarkPaymentPaid} onDeletePayment={handleDeletePayment} userRole={userRole} />
+                  onMarkPaymentPaid={handleMarkPaymentPaid} onDeletePayment={handleDeletePayment}
+                  onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} userRole={userRole} />
               )}
               {view === "clients" && (
                 <ClientsView clients={clients} tasks={tasks} payments={payments}

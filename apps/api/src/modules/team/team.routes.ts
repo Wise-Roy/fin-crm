@@ -46,8 +46,8 @@ router.get("/", authenticate, async (req: Request, res: Response): Promise<void>
 router.post("/", authenticate, async (req: Request, res: Response): Promise<void> => {
   const user = req.user!;
 
-  if (user.role !== "OWNER") {
-    res.status(403).json({ error: "Only the owner can add team members" });
+  if (user.role !== "OWNER" && user.role !== "ADMIN") {
+    res.status(403).json({ error: "Only owner or admin can add team members" });
     return;
   }
 
@@ -112,8 +112,8 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
 router.put("/:id", authenticate, async (req: Request, res: Response): Promise<void> => {
   const user = req.user!;
 
-  if (user.role !== "OWNER") {
-    res.status(403).json({ error: "Only the owner can update team members" });
+  if (user.role !== "OWNER" && user.role !== "ADMIN") {
+    res.status(403).json({ error: "Only owner or admin can update team members" });
     return;
   }
 

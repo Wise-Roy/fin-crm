@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Lock, X, IndianRupee, History, Trash2, Search } from "lucide-react";
+import { Plus, Lock, X, IndianRupee, History, Trash2, Search, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Task, TaskStatus, TaskPayment, TaskHistory, Role, TeamMember } from "@/lib/types";
 import { STATUS_CFG, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials, getAssignableMembers } from "@/lib/utils";
@@ -18,6 +18,8 @@ export function TasksView({
   onCreatePayment,
   onMarkPaymentPaid,
   onDeletePayment,
+  onUpdateTask,
+  onDeleteTask,
   userRole,
 }: {
   tasks: Task[];
@@ -29,6 +31,8 @@ export function TasksView({
   onCreatePayment: (data: { task_id: string; payment_type: string; amount: number }) => void;
   onMarkPaymentPaid: (id: string) => void;
   onDeletePayment: (id: string) => void;
+  onUpdateTask: (id: string, data: Record<string, unknown>) => Promise<void>;
+  onDeleteTask: (id: string) => void;
   userRole: Role;
 }) {
   const [filter, setFilter] = useState<"all" | TaskStatus>("all");
@@ -36,6 +40,13 @@ export function TasksView({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskHistory, setTaskHistory] = useState<TaskHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Edit task state
+  const [editMode, setEditMode] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editPriority, setEditPriority] = useState<string>("");
+  const [editSaving, setEditSaving] = useState(false);
 
   // Payment form (sidebar)
   const [showPayForm, setShowPayForm] = useState(false);
@@ -255,16 +266,55 @@ export function TasksView({
               className="fixed top-0 right-0 h-full w-[420px] max-w-full bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col"
             >
             <div className="flex items-start justify-between px-5 py-4 border-b border-gray-50 shrink-0">
-              <div className="min-w-0 pr-4">
-                <h3 className="text-base font-semibold text-gray-900 truncate">{selectedTask.title}</h3>
+              <div className="min-w-0 pr-4 flex-1">
+                {editMode ? (
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full text-base font-semibold text-gray-900 border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                    autoFocus
+                  />
+                ) : (
+                  <h3 className="text-base font-semibold text-gray-900 truncate">{selectedTask.title}</h3>
+                )}
                 <div className="flex items-center gap-2 mt-1">
                   <StatusBadge status={selectedTask.status} />
                   <PriorityDot priority={selectedTask.priority} />
                 </div>
               </div>
-              <button onClick={() => setSelectedTask(null)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors shrink-0">
-                <X size={13} className="text-gray-400" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {can(userRole, "add_task") && !editMode && (
+                  <button
+                    onClick={() => {
+                      setEditMode(true);
+                      setEditTitle(selectedTask.title);
+                      setEditDueDate(selectedTask.due_date ? selectedTask.due_date.split("T")[0] : "");
+                      setEditPriority(selectedTask.priority);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors"
+                    title="Edit task"
+                  >
+                    <Pencil size={13} className="text-gray-400" />
+                  </button>
+                )}
+                {can(userRole, "add_task") && (
+                  <button
+                    onClick={() => {
+                      if (confirm("Cancel this task? This action cannot be undone.")) {
+                        onDeleteTask(selectedTask.id);
+                        setSelectedTask(null);
+                      }
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors"
+                    title="Cancel task"
+                  >
+                    <Trash2 size={13} className="text-gray-400 hover:text-red-500" />
+                  </button>
+                )}
+                <button onClick={() => setSelectedTask(null)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors">
+                  <X size={13} className="text-gray-400" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto p-5 space-y-5">
@@ -298,13 +348,58 @@ export function TasksView({
                 </div>
                 <div>
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Due</div>
-                  <div className="text-xs font-medium text-gray-800 truncate">{selectedTask.due_date ? fmtDate(selectedTask.due_date) : "\u2014"}</div>
+                  {editMode ? (
+                    <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)}
+                      className="w-full text-xs font-medium text-gray-800 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                  ) : (
+                    <div className="text-xs font-medium text-gray-800 truncate">{selectedTask.due_date ? fmtDate(selectedTask.due_date) : "\u2014"}</div>
+                  )}
                 </div>
                 <div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Created</div>
-                  <div className="text-xs font-medium text-gray-800 truncate">{fmtDate(selectedTask.created_at)}</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">{editMode ? "Priority" : "Created"}</div>
+                  {editMode ? (
+                    <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)}
+                      className="w-full text-xs font-medium text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none cursor-pointer">
+                      {["LOW", "MEDIUM", "HIGH", "URGENT"].map((p) => (
+                        <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-xs font-medium text-gray-800 truncate">{fmtDate(selectedTask.created_at)}</div>
+                  )}
                 </div>
               </div>
+
+              {editMode && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditMode(false)}
+                    className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!editTitle.trim() || editSaving}
+                    onClick={async () => {
+                      setEditSaving(true);
+                      try {
+                        await onUpdateTask(selectedTask.id, {
+                          title: editTitle.trim(),
+                          due_date: editDueDate || null,
+                          priority: editPriority,
+                        });
+                        setEditMode(false);
+                        setSelectedTask({ ...selectedTask, title: editTitle.trim(), due_date: editDueDate || null, priority: editPriority as any });
+                      } finally {
+                        setEditSaving(false);
+                      }
+                    }}
+                    className="text-xs font-medium bg-gray-900 text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex-1"
+                  >
+                    {editSaving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              )}
 
               {/* Payments Section - OWNER only */}
               {(userRole === "OWNER" || userRole === "ADMIN") && (

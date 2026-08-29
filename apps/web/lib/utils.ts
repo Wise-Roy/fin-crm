@@ -112,9 +112,9 @@ export const can = (role: Role, action: Action): boolean => {
     case "view_requests":
     case "manage_team":
       return role === "OWNER";
-    // Only OWNER can add members
+    // OWNER and ADMIN can add members
     case "add_member":
-      return role === "OWNER";
+      return role === "OWNER" || role === "ADMIN";
     // Only OWNER, ADMIN can edit clients/groups
     case "edit_client":
       return (["OWNER", "ADMIN"] as Role[]).includes(role);

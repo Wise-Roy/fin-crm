@@ -62,7 +62,7 @@ export function TeamView({
               className="w-56 pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-900 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 transition-all"
             />
           </div>
-          {userRole === "OWNER" && (
+          {(userRole === "OWNER" || userRole === "ADMIN") && (
             <button
               onClick={() => setShowAddMember(true)}
               className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
@@ -98,8 +98,8 @@ export function TeamView({
                   <div className="w-11 h-11 rounded-xl bg-gray-900 text-white flex items-center justify-center font-semibold text-sm shrink-0">
                     {getInitials(member.name)}
                   </div>
-                  <div className="flex-1">
-                    {userRole === "OWNER" && (
+                  <div className="flex-1 min-w-0">
+                    {(userRole === "OWNER" || userRole === "ADMIN") && (
                       <button
                         onClick={() => setEditingMember(member)}
                         className="float-right w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
@@ -119,7 +119,7 @@ export function TeamView({
                     {member.position && (
                       <div className="text-xs text-gray-400 mt-0.5">{member.position}</div>
                     )}
-                    <div className="text-xs text-gray-400 mt-0.5">
+                    <div className="text-xs text-gray-400 mt-0.5 truncate">
                       {member.email}
                     </div>
                   </div>
