@@ -245,7 +245,7 @@ export const api = {
     create: (data: {
       pan_number: string; name: string; related_company: string;
       issue_date: string; valid_till_date: string; issuing_authority: string;
-      password: string; client_id?: string; client_group_id?: string;
+      password: string; client_id?: string; client_name?: string; client_group_id?: string; client_group_name?: string;
       position?: string; mobile_number?: string;
     }) =>
       request<{ dsc: Dsc }>("/dsc", {

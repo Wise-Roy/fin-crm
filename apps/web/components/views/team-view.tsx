@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Search } from "lucide-react";
 import type { Task, TeamMember, Role } from "@/lib/types";
 import { STATUS_CFG, isOverdue, getInitials, ROLE_LABELS, ROLE_BADGE } from "@/lib/utils";
 import { AddMemberModal } from "@/components/add-member-modal";
@@ -29,6 +29,19 @@ export function TeamView({
 }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return teamMembers;
+    const q = search.toLowerCase();
+    return teamMembers.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q) ||
+        m.position?.toLowerCase().includes(q) ||
+        m.role.toLowerCase().includes(q)
+    );
+  }, [teamMembers, search]);
 
   return (
     <div>
@@ -38,25 +51,37 @@ export function TeamView({
           <h2 className="text-lg font-semibold text-gray-900">Team Members</h2>
           <p className="text-xs text-gray-400">{teamMembers.length} members</p>
         </div>
-        {userRole === "OWNER" && (
-          <button
-            onClick={() => setShowAddMember(true)}
-            className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
-          >
-            <Plus size={14} /> Add Member
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search members..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-56 pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-900 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 transition-all"
+            />
+          </div>
+          {userRole === "OWNER" && (
+            <button
+              onClick={() => setShowAddMember(true)}
+              className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
+            >
+              <Plus size={14} /> Add Member
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Members */}
       {(
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teamMembers.length === 0 && (
+          {filtered.length === 0 && (
             <div className="col-span-full text-center py-14 text-sm text-gray-400">
               No team members found.
             </div>
           )}
-          {teamMembers.map((member, i) => {
+          {filtered.map((member, i) => {
             const memberTasks = tasks.filter((t) => t.assigned_to_employee_id === member.id);
             const active = memberTasks.filter((t) => t.status !== "COMPLETED" && t.status !== "CANCELLED");
             const done = memberTasks.filter((t) => t.status === "COMPLETED");

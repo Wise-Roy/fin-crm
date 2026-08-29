@@ -58,8 +58,8 @@ router.get("/:id", authenticate, async (req: Request, res: Response): Promise<vo
 router.post("/", authenticate, async (req: Request, res: Response): Promise<void> => {
   const {
     pan_number, name, related_company, issue_date, valid_till_date,
-    issuing_authority, client_id, client_group_id, password,
-    position, mobile_number,
+    issuing_authority, client_id, client_name, client_group_id, client_group_name,
+    password, position, mobile_number,
   } = req.body as Record<string, string | undefined>;
 
   if (!pan_number || !name || !related_company || !issue_date || !valid_till_date || !issuing_authority || !password) {
@@ -77,12 +77,30 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
     if (phoneErr) { res.status(400).json({ error: phoneErr }); return; }
   }
 
+  // Resolve client: use existing client_id, or create new client from client_name
+  let resolvedClientId: string | null = client_id || null;
+  if (!client_id && client_name?.trim()) {
+    const newClient = await prisma.client.create({
+      data: { tenant_id: req.tenant!.id, name: client_name.trim(), is_active: true },
+    });
+    resolvedClientId = newClient.id;
+  }
+
   // Validate client belongs to tenant if provided
   if (client_id) {
     const client = await prisma.client.findFirst({
       where: { id: client_id, tenant_id: req.tenant!.id },
     });
     if (!client) { res.status(404).json({ error: "Client not found" }); return; }
+  }
+
+  // Resolve client group: use existing id, or create from name under resolved client
+  let resolvedGroupId: string | null = client_group_id || null;
+  if (!client_group_id && client_group_name?.trim() && resolvedClientId) {
+    const newGroup = await prisma.client_group.create({
+      data: { client_id: resolvedClientId, group_name: client_group_name.trim(), is_active: true },
+    });
+    resolvedGroupId = newGroup.id;
   }
 
   const dsc = await prisma.dsc.create({
@@ -94,8 +112,8 @@ router.post("/", authenticate, async (req: Request, res: Response): Promise<void
       issue_date: new Date(issue_date),
       valid_till_date: new Date(valid_till_date),
       issuing_authority,
-      client_id: client_id || null,
-      client_group_id: client_group_id || null,
+      client_id: resolvedClientId,
+      client_group_id: resolvedGroupId,
       password,
       position: position || null,
       mobile_number: mobile_number || null,

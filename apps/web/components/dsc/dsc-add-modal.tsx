@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X, AlertCircle } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { X, AlertCircle, ChevronDown, Search } from "lucide-react";
 import { motion } from "motion/react";
 import type { Client } from "@/lib/types";
 import { validatePAN, validatePhone } from "@/lib/validations";
@@ -19,10 +19,172 @@ interface DscAddModalProps {
     issuing_authority: string;
     password: string;
     client_id?: string;
+    client_name?: string;
     client_group_id?: string;
+    client_group_name?: string;
     position?: string;
     mobile_number?: string;
   }) => Promise<void>;
+}
+
+function FreeformCombobox({ selectedId, textValue, onChange, options, placeholder }: {
+  selectedId: string;
+  textValue: string;
+  onChange: (id: string, name: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return options;
+    const q = query.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  const displayValue = selectedId ? options.find((o) => o.value === selectedId)?.label || "" : textValue;
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={open ? query : displayValue}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onChange("", e.target.value);
+            if (!open) setOpen(true);
+          }}
+          onFocus={() => { setOpen(true); setQuery(displayValue); }}
+          placeholder={placeholder}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-all"
+        />
+        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-auto">
+          {filtered.length > 0 ? (
+            filtered.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value, ""); setQuery(""); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedId === o.value ? "bg-gray-50 font-medium text-gray-900" : "text-gray-700"}`}
+              >
+                {o.label}
+              </button>
+            ))
+          ) : query.trim() ? (
+            <div className="px-3 py-2">
+              <div className="text-xs text-gray-400 mb-1">No matching client</div>
+              <button
+                type="button"
+                onClick={() => { onChange("", query.trim()); setOpen(false); }}
+                className="text-sm text-gray-900 font-medium hover:text-gray-700"
+              >
+                Use &quot;{query.trim()}&quot; as new client
+              </button>
+            </div>
+          ) : (
+            <div className="px-3 py-3 text-xs text-gray-400 text-center">Type to search or add new</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Combobox({ value, onChange, options, placeholder, disabled }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return options;
+    const q = query.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div ref={ref} className="relative">
+      <div
+        onClick={() => { if (!disabled) { setOpen(!open); setQuery(""); setTimeout(() => inputRef.current?.focus(), 0); } }}
+        className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:border-gray-400 transition-all flex items-center justify-between cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed bg-gray-50" : "bg-white"}`}
+      >
+        <span className={selected ? "text-gray-900" : "text-gray-400"}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown size={14} className="text-gray-400 shrink-0" />
+      </div>
+      {open && !disabled && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 flex flex-col overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
+            <Search size={12} className="text-gray-400 shrink-0" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search..."
+              className="w-full text-sm focus:outline-none"
+              autoFocus
+            />
+          </div>
+          <div className="overflow-auto flex-1">
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${!value ? "bg-gray-50 font-medium" : "text-gray-500"}`}
+            >
+              {placeholder}
+            </button>
+            {filtered.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${value === o.value ? "bg-gray-50 font-medium text-gray-900" : "text-gray-700"}`}
+              >
+                {o.label}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-3 text-xs text-gray-400 text-center">No results</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps) {
@@ -34,7 +196,9 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
   const [issuingAuthority, setIssuingAuthority] = useState("");
   const [password, setPassword] = useState("");
   const [clientId, setClientId] = useState("");
+  const [clientName, setClientName] = useState("");
   const [clientGroupId, setClientGroupId] = useState("");
+  const [clientGroupName, setClientGroupName] = useState("");
   const [position, setPosition] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [error, setError] = useState("");
@@ -52,7 +216,9 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
     setIssuingAuthority("");
     setPassword("");
     setClientId("");
+    setClientName("");
     setClientGroupId("");
+    setClientGroupName("");
     setPosition("");
     setMobileNumber("");
     setError("");
@@ -82,8 +248,8 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
         valid_till_date: validTillDate,
         issuing_authority: issuingAuthority,
         password,
-        ...(clientId ? { client_id: clientId } : {}),
-        ...(clientGroupId ? { client_group_id: clientGroupId } : {}),
+        ...(clientId ? { client_id: clientId } : clientName ? { client_name: clientName } : {}),
+        ...(clientGroupId ? { client_group_id: clientGroupId } : clientGroupName ? { client_group_name: clientGroupName } : {}),
         ...(position ? { position } : {}),
         ...(mobileNumber ? { mobile_number: mobileNumber } : {}),
       });
@@ -177,30 +343,23 @@ export function DscAddModal({ open, onClose, clients, onAdd }: DscAddModalProps)
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Customer (Client)</label>
-                <select
-                  value={clientId}
-                  onChange={(e) => { setClientId(e.target.value); setClientGroupId(""); }}
-                  className={inputCls}
-                >
-                  <option value="">— Select Client —</option>
-                  {clients.filter((c) => c.is_active).map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <FreeformCombobox
+                  selectedId={clientId}
+                  textValue={clientName}
+                  onChange={(id, name) => { setClientId(id); setClientName(name); setClientGroupId(""); setClientGroupName(""); }}
+                  options={clients.filter((c) => c.is_active).map((c) => ({ value: c.id, label: c.name }))}
+                  placeholder="Type or select client"
+                />
               </div>
               <div>
                 <label className={labelCls}>Client Group</label>
-                <select
-                  value={clientGroupId}
-                  onChange={(e) => setClientGroupId(e.target.value)}
-                  className={inputCls}
-                  disabled={!clientId || groups.length === 0}
-                >
-                  <option value="">— Select Group —</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.group_name}</option>
-                  ))}
-                </select>
+                <FreeformCombobox
+                  selectedId={clientGroupId}
+                  textValue={clientGroupName}
+                  onChange={(id, name) => { setClientGroupId(id); setClientGroupName(name); }}
+                  options={groups.map((g) => ({ value: g.id, label: g.group_name }))}
+                  placeholder="Type or select group"
+                />
               </div>
             </div>
 

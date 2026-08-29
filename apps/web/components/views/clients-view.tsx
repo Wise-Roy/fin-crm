@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Building2, X, Users, FolderPlus, IndianRupee, Trash2, Edit3, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Plus, Building2, X, Users, FolderPlus, IndianRupee, Trash2, Edit3, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Task, Client, ClientGroup, ClientKyc, TaskPayment, ClientRevenue, Role } from "@/lib/types";
 import { can, fmtDate, fmtINR } from "@/lib/utils";
@@ -63,7 +63,20 @@ export function ClientsView({
   const [showGroupKyc, setShowGroupKyc] = useState(false);
   const [groupKycMode, setGroupKycMode] = useState<"none" | "copy" | "custom">("none");
 
-  const filtered = clients;
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return clients;
+    const q = search.toLowerCase();
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q) ||
+        c.business_pan?.toLowerCase().includes(q) ||
+        c.client_group?.some((g) => g.group_name.toLowerCase().includes(q))
+    );
+  }, [clients, search]);
 
   const selectedClient = selected ? clients.find((c) => c.id === selected.id) || null : null;
   const clientTasks = selectedClient ? tasks.filter((t) => t.client_id === selectedClient.id) : [];
@@ -277,14 +290,24 @@ export function ClientsView({
   const canViewDetails = can(userRole, "view_client_details");
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-140px)]">
-      {/* Left: Client list */}
-      <div className={`bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col transition-all ${selectedClient ? "w-full lg:w-[55%]" : "w-full"}`}>
+    <div>
+      {/* Client list */}
+      <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50 shrink-0">
           <h3 className="text-base font-semibold text-gray-900">
-            Clients 
+            Clients
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search clients..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-48 pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-900 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 transition-all"
+              />
+            </div>
             {canAdd && (
               <div className="flex items-center gap-1">
                 <button onClick={() => setAddMode(addMode === "client" ? null : "client")} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm ${addMode === "client" ? "bg-gray-700 text-white" : "bg-gray-900 text-white hover:bg-gray-800"}`}>
@@ -427,14 +450,24 @@ export function ClientsView({
         </div>
       </div>
 
-      {/* Right: Detail panel */}
+      {/* Client Detail Side Modal */}
       <AnimatePresence>
         {selectedClient && (
-          <motion.div
-            initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 16 }}
-            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            className="hidden lg:flex flex-col bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex-1"
-          >
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/20 z-40"
+              onClick={() => { setSelected(null); setEditMode(false); }}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+              className="fixed top-0 right-0 h-full w-[420px] max-w-full bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col"
+            >
             <div className="flex items-start justify-between px-5 py-4 border-b border-gray-50 shrink-0">
               <div className="min-w-0 pr-4">
                 <h3 className="text-base font-semibold text-gray-900 truncate">{selectedClient.name}</h3>
@@ -760,7 +793,8 @@ export function ClientsView({
               </>
               )}
             </div>
-          </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

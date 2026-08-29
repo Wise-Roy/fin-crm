@@ -25,7 +25,7 @@ export function DscView({
   onAdd: (data: {
     pan_number: string; name: string; related_company: string;
     issue_date: string; valid_till_date: string; issuing_authority: string;
-    password: string; client_id?: string; client_group_id?: string;
+    password: string; client_id?: string; client_name?: string; client_group_id?: string; client_group_name?: string;
     position?: string; mobile_number?: string;
   }) => Promise<void>;
   onUpdate: (id: string, data: Record<string, unknown>) => void;
@@ -110,7 +110,7 @@ export function DscView({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         {/* Status tabs */}
         <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
           {statusTabs.map((tab) => (
@@ -130,14 +130,14 @@ export function DscView({
         </div>
 
         {/* Search */}
-        <div className="relative flex-1 max-w-xs">
-          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
             placeholder="Search DSC..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-all"
+            className="w-56 pl-8 pr-3 py-1.5 text-sm rounded-lg border border-gray-900 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 transition-all"
           />
         </div>
       </div>

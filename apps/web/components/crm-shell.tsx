@@ -14,7 +14,6 @@ import {
   LogOut,
   Loader2,
   Settings,
-  Search,
   Shield,
   HelpCircle,
   FileSpreadsheet,
@@ -198,10 +197,18 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   const handleTaskStatusChange = useCallback(async (id: string, status: TaskStatus) => {
+    let oldStatus: TaskStatus | undefined;
+    setTasks((prev) => prev.map((t) => {
+      if (t.id === id) { oldStatus = t.status; return { ...t, status }; }
+      return t;
+    }));
     try {
       const { task } = await api.tasks.updateStatus(id, status);
       setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
-    } catch (err) { console.error("Failed to update task status:", err); }
+    } catch (err) {
+      console.error("Failed to update task status:", err);
+      if (oldStatus) setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: oldStatus! } : t)));
+    }
   }, []);
 
   const handleAssignTask = useCallback(async (id: string, assigneeId: string) => {
@@ -262,11 +269,15 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const handleAddDsc = useCallback(async (data: {
     pan_number: string; name: string; related_company: string;
     issue_date: string; valid_till_date: string; issuing_authority: string;
-    password: string; client_id?: string; client_group_id?: string;
+    password: string; client_id?: string; client_name?: string; client_group_id?: string; client_group_name?: string;
     position?: string; mobile_number?: string;
   }) => {
     const { dsc } = await api.dsc.create(data);
     setDscEntries((prev) => [dsc, ...prev]);
+    // If a new client was created adhoc, refresh clients list
+    if (data.client_name && dsc.client) {
+      setClients((prev) => prev.some((c) => c.id === dsc.client!.id) ? prev : [...prev, { ...dsc.client!, is_active: true, created_at: new Date().toISOString() } as any]);
+    }
   }, []);
 
   const handleUpdateDsc = useCallback(async (id: string, data: Record<string, unknown>) => {
@@ -543,18 +554,6 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
         >
           {/* Left: search + date */}
           <div className="hidden md:flex items-center gap-2 max-w-lg flex-1 mx-8">
-            {view !== "dsc" && (
-              <div className="relative w-full max-w-xs">
-                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-gray-900/10 transition-all"
-                  style={{ borderColor: `${navbarFg}12`, backgroundColor: `${navbarFg}04`, color: navbarFg }}
-                  readOnly
-                />
-              </div>
-            )}
             <DateRangeSelector value={dateRange} onChange={setDateRange} />
           </div>
 

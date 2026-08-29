@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Lock, X, IndianRupee, History, Trash2 } from "lucide-react";
+import { Plus, Lock, X, IndianRupee, History, Trash2, Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Task, TaskStatus, TaskPayment, TaskHistory, Role, TeamMember } from "@/lib/types";
 import { STATUS_CFG, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials, getAssignableMembers } from "@/lib/utils";
@@ -23,7 +23,7 @@ export function TasksView({
   tasks: Task[];
   payments: TaskPayment[];
   teamMembers: TeamMember[];
-  onStatusChange: (id: string, s: TaskStatus) => void;
+  onStatusChange: (id: string, s: TaskStatus) => void | Promise<void>;
   onAssignTask: (id: string, assigneeId: string) => void;
   onAddTask: () => void;
   onCreatePayment: (data: { task_id: string; payment_type: string; amount: number }) => void;
@@ -32,27 +32,43 @@ export function TasksView({
   userRole: Role;
 }) {
   const [filter, setFilter] = useState<"all" | TaskStatus>("all");
+  const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskHistory, setTaskHistory] = useState<TaskHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Payment form
+  // Payment form (sidebar)
   const [showPayForm, setShowPayForm] = useState(false);
-  const [payType, setPayType] = useState("");
   const [payAmount, setPayAmount] = useState("");
 
-  const filtered = useMemo(
-    () =>
-      tasks.filter((t) => filter === "all" || t.status === filter),
-    [tasks, filter]
-  );
+  // Hide unassigned tasks from MANAGER and EMPLOYEE
+  const visibleTasks = useMemo(() => {
+    if (userRole === "OWNER" || userRole === "ADMIN") return tasks;
+    return tasks.filter((t) => t.assigned_to_employee_id);
+  }, [tasks, userRole]);
+
+  const filtered = useMemo(() => {
+    let result = visibleTasks.filter((t) => filter === "all" || t.status === filter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.client?.name?.toLowerCase().includes(q) ||
+          t.users_task_assigned_to_employee_idTousers?.name?.toLowerCase().includes(q) ||
+          t.categories?.name?.toLowerCase().includes(q) ||
+          t.sub_categories?.name?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [visibleTasks, filter, search]);
 
   const tabs: Array<{ key: "all" | TaskStatus; label: string; count: number }> = [
-    { key: "all", label: "All", count: tasks.length },
-    { key: "TODO", label: "To Do", count: tasks.filter((t) => t.status === "TODO").length },
-    { key: "IN_PROGRESS", label: "In Progress", count: tasks.filter((t) => t.status === "IN_PROGRESS").length },
-    { key: "REVIEW", label: "Review", count: tasks.filter((t) => t.status === "REVIEW").length },
-    { key: "COMPLETED", label: "Done", count: tasks.filter((t) => t.status === "COMPLETED").length },
+    { key: "all", label: "All", count: visibleTasks.length },
+    { key: "TODO", label: "To Do", count: visibleTasks.filter((t) => t.status === "TODO").length },
+    { key: "IN_PROGRESS", label: "In Progress", count: visibleTasks.filter((t) => t.status === "IN_PROGRESS").length },
+    { key: "REVIEW", label: "Review", count: visibleTasks.filter((t) => t.status === "REVIEW").length },
+    { key: "COMPLETED", label: "Done", count: visibleTasks.filter((t) => t.status === "COMPLETED").length },
   ];
 
   const openDetail = async (task: Task) => {
@@ -74,18 +90,18 @@ export function TasksView({
     : [];
 
   const submitPayment = () => {
-    if (!selectedTask || !payType.trim() || !payAmount) return;
+    if (!selectedTask || !payAmount) return;
     const amt = parseFloat(payAmount);
     if (isNaN(amt) || amt <= 0) return;
-    onCreatePayment({ task_id: selectedTask.id, payment_type: payType.trim(), amount: amt });
-    setPayType("");
+    onCreatePayment({ task_id: selectedTask.id, payment_type: "Payment", amount: amt });
     setPayAmount("");
     setShowPayForm(false);
   };
 
+
   return (
-    <div className="flex gap-4 h-full">
-      <div className={`space-y-4 transition-all ${selectedTask ? "flex-1" : "w-full"}`}>
+    <div>
+      <div className="space-y-4">
         {!can(userRole, "see_all") && (
           <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-blue-700 flex items-center gap-2">
             <Lock size={11} /> Showing your assigned tasks only
@@ -106,14 +122,26 @@ export function TasksView({
               </button>
             ))}
           </div>
-          {can(userRole, "add_task") && (
-            <button
-              onClick={onAddTask}
-              className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
-            >
-              <Plus size={14} /> Add Task
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search tasks..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-56 pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-900 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/20 transition-all"
+              />
+            </div>
+            {can(userRole, "add_task") && (
+              <button
+                onClick={onAddTask}
+                className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all"
+              >
+                <Plus size={14} /> Add Task
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
@@ -121,7 +149,7 @@ export function TasksView({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-50 bg-gray-50/40">
-                  {["Task", "Client", "Assignee", "Status", "Priority", "Due", "Payment", "Action"].map((h) => (
+                  {["Task", "Client", "Assignee", "Status", "Priority", "Due", ...(userRole === "OWNER" || userRole === "ADMIN" ? ["Payment"] : []), "Action"].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -133,7 +161,6 @@ export function TasksView({
                   const assignee = task.users_task_assigned_to_employee_idTousers;
                   const tp = payments.filter((p) => p.task_id === task.id);
                   const totalPay = tp.reduce((s, p) => s + Number(p.amount), 0);
-                  const paidPay = tp.filter((p) => p.payment_status === "SUCCESS").reduce((s, p) => s + Number(p.amount), 0);
                   return (
                     <motion.tr
                       key={task.id}
@@ -175,15 +202,15 @@ export function TasksView({
                           <span className="text-xs text-gray-300">{"\u2014"}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {totalPay > 0 ? (
-                          <span className="text-xs text-gray-600">
-                            {fmtINR(paidPay)}<span className="text-gray-300">/{fmtINR(totalPay)}</span>
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-300">{"\u2014"}</span>
-                        )}
-                      </td>
+                      {(userRole === "OWNER" || userRole === "ADMIN") && (
+                        <td className="px-4 py-3">
+                          {totalPay > 0 ? (
+                            <span className="text-xs text-gray-600 font-medium">{fmtINR(totalPay)}</span>
+                          ) : (
+                            <span className="text-xs text-gray-300">{"\u2014"}</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <select
                           value={task.status}
@@ -209,16 +236,24 @@ export function TasksView({
         </div>
       </div>
 
-      {/* Task Detail Panel */}
+      {/* Task Detail Side Modal */}
       <AnimatePresence>
         {selectedTask && (
-          <motion.div
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 16 }}
-            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            className="hidden lg:flex flex-col bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden w-[380px] shrink-0"
-          >
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/20 z-40"
+              onClick={() => setSelectedTask(null)}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+              className="fixed top-0 right-0 h-full w-[420px] max-w-full bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col"
+            >
             <div className="flex items-start justify-between px-5 py-4 border-b border-gray-50 shrink-0">
               <div className="min-w-0 pr-4">
                 <h3 className="text-base font-semibold text-gray-900 truncate">{selectedTask.title}</h3>
@@ -271,29 +306,25 @@ export function TasksView({
                 </div>
               </div>
 
-              {/* Payments Section */}
+              {/* Payments Section - OWNER only */}
+              {(userRole === "OWNER" || userRole === "ADMIN") && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
                     <IndianRupee size={10} /> Payments ({taskPayments.length})
                   </h4>
-                  {can(userRole, "manage_payments") && (
-                    <button onClick={() => setShowPayForm(!showPayForm)} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
-                      <Plus size={10} /> Add
-                    </button>
-                  )}
+                  <button onClick={() => setShowPayForm(!showPayForm)} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
+                    <Plus size={10} /> Add
+                  </button>
                 </div>
 
                 <AnimatePresence>
                   {showPayForm && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mb-3">
-                      <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <input placeholder="Payment type (e.g. Service Fee)" value={payType} onChange={(e) => setPayType(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                        <input type="number" placeholder="Amount" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-medium" />
-                        <div className="flex gap-2">
-                          <button onClick={() => setShowPayForm(false)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100">Cancel</button>
-                          <button onClick={submitPayment} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 flex-1">Add Payment</button>
-                        </div>
+                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <input type="number" placeholder="₹ Amount" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 font-medium" onKeyDown={(e) => { if (e.key === "Enter") submitPayment(); }} />
+                        <button onClick={submitPayment} className="text-xs font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800">Add</button>
+                        <button onClick={() => setShowPayForm(false)} className="text-xs text-gray-400 hover:text-gray-600"><X size={12} /></button>
                       </div>
                     </motion.div>
                   )}
@@ -306,19 +337,18 @@ export function TasksView({
                     taskPayments.map((p) => (
                       <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 group/pay">
                         <div>
-                          <div className="text-xs font-medium text-gray-700">{p.payment_type}</div>
-                          <div className="text-xs text-gray-500">{fmtINR(Number(p.amount))}</div>
+                          <div className="text-xs font-medium text-gray-700">{fmtINR(Number(p.amount))}</div>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${PAYMENT_CLS[p.payment_status]}`}>
                             {p.payment_status === "SUCCESS" ? "Paid" : p.payment_status.charAt(0) + p.payment_status.slice(1).toLowerCase()}
                           </span>
-                          {p.payment_status === "PENDING" && can(userRole, "mark_payment_done") && selectedTask.status === "COMPLETED" && (
+                          {p.payment_status === "PENDING" && selectedTask.status === "COMPLETED" && (
                             <button onClick={() => onMarkPaymentPaid(p.id)} className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded hover:bg-emerald-100 font-medium opacity-0 group-hover/pay:opacity-100 transition-opacity">
                               Mark Paid
                             </button>
                           )}
-                          {p.payment_status === "PENDING" && can(userRole, "mark_payment_done") && (
+                          {p.payment_status === "PENDING" && (
                             <button onClick={() => onDeletePayment(p.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover/pay:opacity-100 transition-all">
                               <Trash2 size={11} />
                             </button>
@@ -332,6 +362,7 @@ export function TasksView({
                   <p className="text-xs text-amber-600 mt-2">Task must be completed before payments can be marked as paid.</p>
                 )}
               </div>
+              )}
 
               {/* History Section */}
               <div>
@@ -363,7 +394,8 @@ export function TasksView({
                 )}
               </div>
             </div>
-          </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
