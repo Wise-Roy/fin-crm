@@ -20,8 +20,8 @@ const TASK_INCLUDES = {
 const ASSIGNABLE_ROLES: Record<string, string[]> = {
   OWNER: ["ADMIN", "MANAGER", "EMPLOYEE"],
   ADMIN: ["MANAGER", "EMPLOYEE"],
-  MANAGER: ["EMPLOYEE"],
-  EMPLOYEE: [],
+  MANAGER: ["MANAGER", "EMPLOYEE"],
+  EMPLOYEE: ["MANAGER", "EMPLOYEE"],
 };
 
 /** GET /api/tasks/my — tasks assigned to me */
@@ -342,11 +342,24 @@ router.patch(
       return;
     }
 
-    const task = await prisma.task.update({
-      where: { id: req.params.id as string },
-      data: { assigned_to_employee_id, updated_at: new Date() },
-      include: TASK_INCLUDES,
-    });
+    const [task] = await Promise.all([
+      prisma.task.update({
+        where: { id: req.params.id as string },
+        data: { assigned_to_employee_id, updated_at: new Date() },
+        include: TASK_INCLUDES,
+      }),
+      // Log assignment change to task_history
+      prisma.task_history.create({
+        data: {
+          tenant_id: req.tenant!.id,
+          task_id: req.params.id as string,
+          changed_by_user_id: req.user!.id,
+          action: "assignment_change",
+          old_value: { assigned_to: existing.assigned_to_employee_id },
+          new_value: { assigned_to: assigned_to_employee_id },
+        },
+      }),
+    ]);
 
     // Notify new assignee
     if (assigned_to_employee_id !== req.user!.id) {

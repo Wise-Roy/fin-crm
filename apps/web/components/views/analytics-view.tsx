@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -15,7 +15,10 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { CheckCircle2, X } from "lucide-react";
 import type { Task, Client, TeamMember, Role } from "@/lib/types";
+import { fmtDate } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui-atoms";
 
 export function AnalyticsView({
   tasks,
@@ -29,6 +32,7 @@ export function AnalyticsView({
   userRole: Role;
 }) {
   const [empFilter, setEmpFilter] = useState<string>("all");
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   // Group tasks by month
   const monthlyMap = new Map<string, { added: number; done: number }>();
@@ -62,11 +66,25 @@ export function AnalyticsView({
   // Tasks per client
   const clientData = clients
     .map((c) => ({
-      name: c.name.split(" ")[0],
+      id: c.id,
+      name: c.name.length > 10 ? c.name.split(" ")[0] : c.name,
+      fullName: c.name,
       tasks: tasks.filter((t) => t.client_id === c.id).length,
     }))
     .sort((a, b) => b.tasks - a.tasks)
     .slice(0, 8);
+
+  const handleBarClick = useCallback((data: any) => {
+    if (data?.id) {
+      setSelectedClientId((prev) => prev === data.id ? null : data.id);
+    }
+  }, []);
+
+  const selectedClient = selectedClientId ? clients.find((c) => c.id === selectedClientId) : null;
+  const selectedClientTasks = useMemo(() => {
+    if (!selectedClientId) return [];
+    return tasks.filter((t) => t.client_id === selectedClientId && t.status === "COMPLETED");
+  }, [tasks, selectedClientId]);
 
   const statusData = [
     { name: "To Do", value: tasks.filter((t) => t.status === "TODO").length, color: "#9CA3AF" },
@@ -139,7 +157,11 @@ export function AnalyticsView({
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <Tooltip {...ttp} />
-                <Bar dataKey="tasks" fill="#111827" radius={[4, 4, 0, 0]} maxBarSize={44} name="Tasks" />
+                <Bar dataKey="tasks" radius={[4, 4, 0, 0]} maxBarSize={44} name="Tasks" onClick={handleBarClick} className="cursor-pointer">
+                  {clientData.map((entry) => (
+                    <Cell key={entry.id} fill={entry.id === selectedClientId ? "#374151" : "#111827"} stroke={entry.id === selectedClientId ? "#111827" : "none"} strokeWidth={entry.id === selectedClientId ? 2 : 0} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -218,6 +240,50 @@ export function AnalyticsView({
           )}
         </div>
       </div>
+
+      {/* Completed Tasks for Selected Client — separate card */}
+      {selectedClient && (
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="typo-card-title text-gray-900 flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-500" />
+              Completed Tasks — {selectedClient.name}
+              <span className="text-sm font-normal text-gray-400">({selectedClientTasks.length})</span>
+            </h3>
+            <button onClick={() => setSelectedClientId(null)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors">
+              <X size={14} className="text-gray-400" />
+            </button>
+          </div>
+          {selectedClientTasks.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">No completed tasks for this client.</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {selectedClientTasks.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-2.5 px-1">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                    <span className="text-sm font-medium text-gray-800 truncate">{t.title}</span>
+                    {t.categories && (
+                      <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded shrink-0">{t.categories.name}</span>
+                    )}
+                    {t.sub_categories && (
+                      <span className="text-xs bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded shrink-0">{t.sub_categories.name}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 ml-3">
+                    {t.users_task_assigned_to_employee_idTousers && (
+                      <span className="text-xs text-gray-400">{t.users_task_assigned_to_employee_idTousers.name}</span>
+                    )}
+                    <span className="text-xs text-gray-400">
+                      {t.completed_at ? fmtDate(t.completed_at) : fmtDate(t.updated_at)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

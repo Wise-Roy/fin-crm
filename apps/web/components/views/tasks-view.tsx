@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Lock, X, IndianRupee, History, Trash2, Search, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Task, TaskStatus, TaskPayment, TaskHistory, Role, TeamMember } from "@/lib/types";
 import { STATUS_CFG, PAYMENT_CLS, can, fmtDate, fmtINR, isOverdue, getInitials, getAssignableMembers } from "@/lib/utils";
 import { StatusBadge, PriorityDot, Av } from "@/components/ui-atoms";
 import { api } from "@/lib/api";
+
+export type TaskFilterMode = "all" | "open" | "overdue" | TaskStatus;
 
 export function TasksView({
   tasks,
@@ -21,6 +23,7 @@ export function TasksView({
   onUpdateTask,
   onDeleteTask,
   userRole,
+  initialFilter,
 }: {
   tasks: Task[];
   payments: TaskPayment[];
@@ -34,8 +37,10 @@ export function TasksView({
   onUpdateTask: (id: string, data: Record<string, unknown>) => Promise<void>;
   onDeleteTask: (id: string) => void;
   userRole: Role;
+  initialFilter?: TaskFilterMode;
 }) {
-  const [filter, setFilter] = useState<"all" | TaskStatus>("all");
+  const [filter, setFilter] = useState<TaskFilterMode>(initialFilter || "all");
+  useEffect(() => { if (initialFilter) setFilter(initialFilter); }, [initialFilter]);
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskHistory, setTaskHistory] = useState<TaskHistory[]>([]);
@@ -46,6 +51,7 @@ export function TasksView({
   const [editTitle, setEditTitle] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
   const [editPriority, setEditPriority] = useState<string>("");
+  const [editDescription, setEditDescription] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
   // Payment form (sidebar)
@@ -59,7 +65,12 @@ export function TasksView({
   }, [tasks, userRole]);
 
   const filtered = useMemo(() => {
-    let result = visibleTasks.filter((t) => filter === "all" || t.status === filter);
+    let result = visibleTasks.filter((t) => {
+      if (filter === "all") return true;
+      if (filter === "open") return t.status !== "COMPLETED" && t.status !== "CANCELLED";
+      if (filter === "overdue") return isOverdue(t.due_date, t.status);
+      return t.status === filter;
+    });
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -74,12 +85,16 @@ export function TasksView({
     return result;
   }, [visibleTasks, filter, search]);
 
-  const tabs: Array<{ key: "all" | TaskStatus; label: string; count: number }> = [
+  const openCount = visibleTasks.filter((t) => t.status !== "COMPLETED" && t.status !== "CANCELLED").length;
+  const overdueCount = visibleTasks.filter((t) => isOverdue(t.due_date, t.status)).length;
+  const tabs: Array<{ key: TaskFilterMode; label: string; count: number }> = [
     { key: "all", label: "All", count: visibleTasks.length },
+    { key: "open", label: "Open", count: openCount },
     { key: "TODO", label: "To Do", count: visibleTasks.filter((t) => t.status === "TODO").length },
     { key: "IN_PROGRESS", label: "In Progress", count: visibleTasks.filter((t) => t.status === "IN_PROGRESS").length },
     { key: "REVIEW", label: "Review", count: visibleTasks.filter((t) => t.status === "REVIEW").length },
     { key: "COMPLETED", label: "Done", count: visibleTasks.filter((t) => t.status === "COMPLETED").length },
+    ...(overdueCount > 0 ? [{ key: "overdue" as TaskFilterMode, label: "Overdue", count: overdueCount }] : []),
   ];
 
   const openDetail = async (task: Task) => {
@@ -288,6 +303,7 @@ export function TasksView({
                     onClick={() => {
                       setEditMode(true);
                       setEditTitle(selectedTask.title);
+                      setEditDescription(selectedTask.description || "");
                       setEditDueDate(selectedTask.due_date ? selectedTask.due_date.split("T")[0] ?? "" : "");
                       setEditPriority(selectedTask.priority);
                     }}
@@ -370,6 +386,24 @@ export function TasksView({
                 </div>
               </div>
 
+              {/* Description Section */}
+              {(selectedTask.description || editMode) && (
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Description</div>
+                  {editMode ? (
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      className="w-full text-xs text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-900/10 resize-none"
+                      placeholder="Add description…"
+                    />
+                  ) : (
+                    <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{selectedTask.description}</p>
+                  )}
+                </div>
+              )}
+
               {editMode && (
                 <div className="flex gap-2">
                   <button
@@ -385,11 +419,12 @@ export function TasksView({
                       try {
                         await onUpdateTask(selectedTask.id, {
                           title: editTitle.trim(),
+                          description: editDescription || null,
                           due_date: editDueDate || null,
                           priority: editPriority,
                         });
                         setEditMode(false);
-                        setSelectedTask({ ...selectedTask, title: editTitle.trim(), due_date: editDueDate || null, priority: editPriority as any });
+                        setSelectedTask({ ...selectedTask, title: editTitle.trim(), description: editDescription || null, due_date: editDueDate || null, priority: editPriority as any });
                       } finally {
                         setEditSaving(false);
                       }
@@ -470,21 +505,39 @@ export function TasksView({
                   <p className="text-xs text-gray-400">No history yet.</p>
                 ) : (
                   <div className="space-y-2">
-                    {taskHistory.map((h) => (
-                      <div key={h.id} className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 shrink-0" />
-                        <div>
-                          <div className="text-xs text-gray-600">
-                            <span className="font-medium">{h.users?.name || "System"}</span>
-                            {" changed status "}
-                            <span className=" text-xs">{(h.old_value as any)?.status}</span>
-                            {" \u2192 "}
-                            <span className="font-medium text-xs">{(h.new_value as any)?.status}</span>
+                    {taskHistory.map((h) => {
+                      const isAssignment = h.action === "assignment_change";
+                      const getAssigneeName = (id: string | null | undefined) => {
+                        if (!id) return "Unassigned";
+                        return teamMembers.find((m) => m.id === id)?.name || "Unknown";
+                      };
+                      return (
+                        <div key={h.id} className="flex items-start gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${isAssignment ? "bg-blue-400" : "bg-gray-300"}`} />
+                          <div>
+                            <div className="text-xs text-gray-600">
+                              <span className="font-medium">{h.users?.name || "System"}</span>
+                              {isAssignment ? (
+                                <>
+                                  {" reassigned "}
+                                  <span className="text-xs">{getAssigneeName((h.old_value as any)?.assigned_to)}</span>
+                                  {" \u2192 "}
+                                  <span className="font-medium text-xs">{getAssigneeName((h.new_value as any)?.assigned_to)}</span>
+                                </>
+                              ) : (
+                                <>
+                                  {" changed status "}
+                                  <span className="text-xs">{(h.old_value as any)?.status}</span>
+                                  {" \u2192 "}
+                                  <span className="font-medium text-xs">{(h.new_value as any)?.status}</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400">{fmtDate(h.created_at)}</div>
                           </div>
-                          <div className="text-xs text-gray-400">{fmtDate(h.created_at)}</div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

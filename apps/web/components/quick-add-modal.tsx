@@ -63,6 +63,7 @@ export function QuickAddModal({
   onCategoriesChange: (cats: Category[]) => void;
   onAdd: (data: {
     title: string;
+    description?: string;
     client_id?: string;
     client_group_id?: string;
     assigned_to_employee_id?: string;
@@ -74,6 +75,7 @@ export function QuickAddModal({
   }) => void;
 }) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [clientKey, setClientKey] = useState(""); // "client:<id>" or "group:<id>"
   const [assignedTo, setAssignedTo] = useState("");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
@@ -96,6 +98,7 @@ export function QuickAddModal({
 
   const reset = () => {
     setTitle("");
+    setDescription("");
     setClientKey("");
     setAssignedTo("");
     setPriority("MEDIUM");
@@ -157,6 +160,7 @@ export function QuickAddModal({
 
       onAdd({
         title,
+        description: description || undefined,
         client_id,
         client_group_id,
         assigned_to_employee_id: assignedTo || undefined,
@@ -248,7 +252,7 @@ export function QuickAddModal({
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md pointer-events-auto border border-gray-100 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto border border-gray-100">
               <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-gray-50">
                 <div>
                   <h2 className="typo-card-title text-gray-900">
@@ -277,6 +281,19 @@ export function QuickAddModal({
                     placeholder="e.g., ROC Annual Filing, Board Resolution…"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
+                    Description
+                  </label>
+                  <textarea
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-all resize-none"
+                    placeholder="Add task details…"
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                   />
                 </div>
 

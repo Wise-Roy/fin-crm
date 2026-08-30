@@ -28,7 +28,9 @@ import { QuickAddModal } from "@/components/quick-add-modal";
 import { DateRangeSelector, getLast30DaysRange } from "@/components/date-range-selector";
 import type { DateRange } from "@/components/date-range-selector";
 import { DashboardView } from "@/components/views/dashboard-view";
+import type { KpiFilter } from "@/components/views/dashboard-view";
 import { TasksView } from "@/components/views/tasks-view";
+import type { TaskFilterMode } from "@/components/views/tasks-view";
 import { ClientsView } from "@/components/views/clients-view";
 import { TeamView } from "@/components/views/team-view";
 import { DscView } from "@/components/dsc/dsc-view";
@@ -98,6 +100,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
 
   const [dateRange, setDateRange] = useState<DateRange>(getLast30DaysRange);
 
+  const [taskFilter, setTaskFilter] = useState<TaskFilterMode | undefined>(undefined);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showAddDsc, setShowAddDsc] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -231,7 +234,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   const handleAddTask = useCallback(async (data: {
-    title: string; client_id?: string; client_group_id?: string;
+    title: string; description?: string; client_id?: string; client_group_id?: string;
     assigned_to_employee_id?: string; priority: string; effort?: string; due_date: string;
     category_id?: string; subcategory_id?: string;
   }) => {
@@ -468,7 +471,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
             return (
               <div key={item.id} className="relative group">
                 <button
-                  onClick={() => setView(item.id)}
+                  onClick={() => { setTaskFilter(undefined); setView(item.id); }}
                   className="w-full flex items-center rounded-lg transition-all relative"
                   style={{
                     padding: sidebarExpanded ? "10px 12px" : "10px 0",
@@ -698,6 +701,18 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   teamMembers={teamMembers}
                   reimbursements={reimbs}
                   onAddTask={() => setShowAddTask(true)}
+                  onKpiClick={(kpi: KpiFilter) => {
+                    if (kpi === "clients") {
+                      setView("clients");
+                    } else if (kpi === "reimbursements") {
+                      setView("reimbursements");
+                    } else {
+                      // "open" shows non-completed tasks, "overdue" shows overdue
+                      const filterMap: Record<string, TaskFilterMode> = { open: "open", overdue: "overdue" };
+                      setTaskFilter(filterMap[kpi] || "all");
+                      setView("tasks");
+                    }
+                  }}
                   userRole={userRole}
                   userName={appUser?.name || ""}
                 />
@@ -707,7 +722,8 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                   onStatusChange={handleTaskStatusChange} onAssignTask={handleAssignTask}
                   onAddTask={() => setShowAddTask(true)} onCreatePayment={handleCreatePayment}
                   onMarkPaymentPaid={handleMarkPaymentPaid} onDeletePayment={handleDeletePayment}
-                  onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} userRole={userRole} />
+                  onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} userRole={userRole}
+                  initialFilter={taskFilter} />
               )}
               {view === "clients" && (
                 <ClientsView clients={clients} tasks={tasks} payments={payments}

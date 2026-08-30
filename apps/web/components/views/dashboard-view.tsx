@@ -14,12 +14,15 @@ function getGreeting(): string {
   return "Good evening";
 }
 
+export type KpiFilter = "open" | "overdue" | "clients" | "reimbursements";
+
 export function DashboardView({
   tasks,
   clients,
   teamMembers,
   reimbursements,
   onAddTask,
+  onKpiClick,
   userRole,
   userName,
 }: {
@@ -28,6 +31,7 @@ export function DashboardView({
   teamMembers: TeamMember[];
   reimbursements: Reimbursement[];
   onAddTask: () => void;
+  onKpiClick?: (filter: KpiFilter) => void;
   userRole: Role;
   userName: string;
 }) {
@@ -78,17 +82,18 @@ export function DashboardView({
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Open Tasks", value: stats.total - stats.done, icon: ListTodo, alert: false, sub: `${stats.active} in progress` },
-          { label: "Overdue", value: stats.overdue, icon: AlertCircle, alert: stats.overdue > 0, sub: "Needs attention" },
-          { label: "Active Clients", value: clients.length, icon: TrendingUp, alert: false, sub: `${stats.done} completed` },
-          { label: "Pending Reimb.", value: fmtINR(stats.pendingReimb), icon: Receipt, alert: false, sub: `${stats.pendingReimbCount} requests` },
+          { label: "Open Tasks", value: stats.total - stats.done, icon: ListTodo, alert: false, sub: `${stats.active} in progress`, kpi: "open" as KpiFilter },
+          { label: "Overdue", value: stats.overdue, icon: AlertCircle, alert: stats.overdue > 0, sub: "Needs attention", kpi: "overdue" as KpiFilter },
+          { label: "Active Clients", value: clients.length, icon: TrendingUp, alert: false, sub: `${stats.done} completed`, kpi: "clients" as KpiFilter },
+          { label: "Pending Reimb.", value: fmtINR(stats.pendingReimb), icon: Receipt, alert: false, sub: `${stats.pendingReimbCount} requests`, kpi: "reimbursements" as KpiFilter },
         ].map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-colors"
+            className="bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-colors cursor-pointer hover:shadow-sm"
+            onClick={() => onKpiClick?.(s.kpi)}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">{s.label}</span>
