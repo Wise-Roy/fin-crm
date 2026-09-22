@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import authRoutes from './routes/auth.js'
@@ -44,7 +45,7 @@ app.listen(PORT,()=>{
     console.log(`API server is running on port: ${PORT}`)
 
     // Self-ping health endpoint every 10 min to keep server alive
-    const BASE_URL = process.env.NEXT_PUBLIC_API_URL || `http://localhost:${PORT}`;
+    const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, '') || `http://localhost:${PORT}`;
     setInterval(async () => {
         try {
             const res = await fetch(`${BASE_URL}/api/health`);
@@ -53,5 +54,5 @@ app.listen(PORT,()=>{
         } catch (err) {
             console.error('[health-ping] failed:', (err as Error).message);
         }
-    }, 10 * 60 * 1000); // 10 minutes
+    }, 5 * 60 * 1000); // 5 minutes
 });
