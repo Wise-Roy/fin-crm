@@ -123,7 +123,7 @@ export function QuickAddModal({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || submitting) return;
+    if (!title || !clientKey || !dueDate || !assignedTo || submitting) return;
     setSubmitting(true);
 
     try {
@@ -320,7 +320,7 @@ export function QuickAddModal({
 
                 {/* Client */}
                 <Combobox
-                  label="Client"
+                  label="Client *"
                   options={clientOptions.map((o) => ({ id: o.key, name: o.label }))}
                   value={clientKey}
                   onChange={setClientKey}
@@ -331,14 +331,15 @@ export function QuickAddModal({
                 {can(userRole, "assign_task") && (
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
-                      Assign To
+                      Assign To *
                     </label>
                     <select
+                      required
                       value={assignedTo}
                       onChange={(e) => setAssignedTo(e.target.value)}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">Select assignee…</option>
                       {assignableMembers.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name} — {m.position || m.role}
@@ -381,10 +382,11 @@ export function QuickAddModal({
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1 uppercase tracking-wider">
-                      Due Date
+                      Due Date *
                     </label>
                     <input
                       type="date"
+                      required
                       value={dueDate}
                       onChange={(e) => setDueDate(e.target.value)}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10"
@@ -401,7 +403,7 @@ export function QuickAddModal({
                   </button>
                   <button
                     type="submit"
-                    disabled={submitting}
+                    disabled={submitting || !clientKey || !dueDate || !assignedTo}
                     className="flex-1 bg-gray-900 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
                   >
                     {submitting ? (

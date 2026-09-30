@@ -189,6 +189,7 @@ router.post(
         effort: effort ? (effort as any) : null,
         status: "TODO",
         due_date: due_date ? new Date(due_date) : null,
+        completed_at: due_date ? new Date(due_date) : null,
         category_id: category_id || null,
         subcategory_id: subcategory_id || null,
         client_group_id: client_group_id || null,

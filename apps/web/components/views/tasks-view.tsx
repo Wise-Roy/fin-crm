@@ -41,6 +41,13 @@ export function TasksView({
 }) {
   const [filter, setFilter] = useState<TaskFilterMode>(initialFilter || "all");
   useEffect(() => { if (initialFilter) setFilter(initialFilter); }, [initialFilter]);
+  // Keep selectedTask in sync with tasks prop (e.g. after status change updates completed_at)
+  useEffect(() => {
+    if (selectedTask) {
+      const updated = tasks.find((t) => t.id === selectedTask.id);
+      if (updated) setSelectedTask(updated);
+    }
+  }, [tasks]);
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskHistory, setTaskHistory] = useState<TaskHistory[]>([]);
@@ -370,6 +377,12 @@ export function TasksView({
                   ) : (
                     <div className="text-xs font-medium text-gray-800 truncate">{selectedTask.due_date ? fmtDate(selectedTask.due_date) : "\u2014"}</div>
                   )}
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Completion Date</div>
+                  <div className={`text-xs font-medium truncate ${selectedTask.status === "COMPLETED" ? "text-emerald-600" : "text-gray-800"}`}>
+                    {selectedTask.completed_at ? fmtDate(selectedTask.completed_at) : "\u2014"}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">{editMode ? "Priority" : "Created"}</div>

@@ -20,6 +20,7 @@ export function ClientsView({
   onUpdateClient,
   onAddGroup,
   onUpdateGroup,
+  onDeleteClient,
   onDeleteGroup,
   userRole,
 }: {
@@ -30,6 +31,7 @@ export function ClientsView({
   onUpdateClient: (id: string, data: Record<string, unknown>) => void;
   onAddGroup: (clientId: string, data: Record<string, unknown>) => void;
   onUpdateGroup: (clientId: string, groupId: string, data: Record<string, unknown>) => void;
+  onDeleteClient: (id: string) => void;
   onDeleteGroup: (clientId: string, groupId: string) => void;
   userRole: Role;
 }) {
@@ -475,9 +477,25 @@ export function ClientsView({
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {canEdit && !editMode && (
-                  <button onClick={() => startEditClient(selectedClient)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors" title="Edit client">
-                    <Edit3 size={13} className="text-gray-400" />
-                  </button>
+                  <>
+                    <button onClick={() => startEditClient(selectedClient)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors" title="Edit client">
+                      <Edit3 size={13} className="text-gray-400" />
+                    </button>
+                    {selectedClient.is_active && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Deactivate "${selectedClient.name}"? This client will be marked inactive.`)) {
+                            onDeleteClient(selectedClient.id);
+                            setSelected(null);
+                          }
+                        }}
+                        className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors"
+                        title="Deactivate client"
+                      >
+                        <Trash2 size={13} className="text-gray-400 hover:text-red-500" />
+                      </button>
+                    )}
+                  </>
                 )}
                 <button onClick={() => { setSelected(null); setEditMode(false); }} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors">
                   <X size={13} className="text-gray-400" />

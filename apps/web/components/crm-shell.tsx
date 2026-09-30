@@ -261,6 +261,16 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     setTeamMembers((prev) => prev.map((m) => m.id === id ? member : m));
   }, []);
 
+  const handleDeleteMember = useCallback(async (id: string) => {
+    try {
+      await api.team.delete(id);
+      setTeamMembers((prev) => prev.map((m) => m.id === id ? { ...m, is_active: false } : m));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to deactivate member";
+      alert(msg);
+    }
+  }, []);
+
   const handleAddClient = useCallback(async (data: Record<string, unknown>) => {
     try {
       const { client } = await api.clients.create(data);
@@ -372,6 +382,16 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       setClients((prev) => prev.map((c) => c.id === clientId ? { ...c, client_group: (c.client_group || []).map((g) => g.id === groupId ? group : g) } : c));
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to update group";
+      alert(msg);
+    }
+  }, []);
+
+  const handleDeleteClient = useCallback(async (id: string) => {
+    try {
+      await api.clients.delete(id);
+      setClients((prev) => prev.map((c) => c.id === id ? { ...c, is_active: false } : c));
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to delete client";
       alert(msg);
     }
   }, []);
@@ -729,12 +749,12 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 <ClientsView clients={clients} tasks={tasks} payments={payments}
                   onAddClient={handleAddClient} onUpdateClient={handleUpdateClient}
                   onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup}
-                  onDeleteGroup={handleDeleteGroup} userRole={userRole} />
+                  onDeleteClient={handleDeleteClient} onDeleteGroup={handleDeleteGroup} userRole={userRole} />
               )}
               {view === "team" && (
                 <TeamView teamMembers={teamMembers} tasks={tasks}
                   onAddMember={handleAddMember} onUpdateMember={handleUpdateMember}
-                  userRole={userRole} currentUserId={appUser?.id || ""} />
+                  onDeleteMember={handleDeleteMember} userRole={userRole} currentUserId={appUser?.id || ""} />
               )}
               {view === "dsc" && (
                 <DscView

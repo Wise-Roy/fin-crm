@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Pencil, Search } from "lucide-react";
+import { Plus, Pencil, Search, Trash2 } from "lucide-react";
 import type { Task, TeamMember, Role } from "@/lib/types";
 import { STATUS_CFG, isOverdue, getInitials, ROLE_LABELS, ROLE_BADGE } from "@/lib/utils";
 import { AddMemberModal } from "@/components/add-member-modal";
@@ -13,6 +13,7 @@ export function TeamView({
   tasks,
   onAddMember,
   onUpdateMember,
+  onDeleteMember,
   userRole,
   currentUserId,
 }: {
@@ -24,6 +25,7 @@ export function TeamView({
   onUpdateMember: (id: string, data: {
     name?: string; email?: string; phone?: string; position?: string; role?: string; password?: string;
   }) => Promise<void>;
+  onDeleteMember: (id: string) => void;
   userRole: Role;
   currentUserId: string;
 }) {
@@ -100,13 +102,28 @@ export function TeamView({
                   </div>
                   <div className="flex-1 min-w-0">
                     {(userRole === "OWNER" || userRole === "ADMIN") && (
-                      <button
-                        onClick={() => setEditingMember(member)}
-                        className="float-right w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
-                        title="Edit member"
-                      >
-                        <Pencil size={13} />
-                      </button>
+                      <div className="float-right flex items-center gap-0.5">
+                        <button
+                          onClick={() => setEditingMember(member)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
+                          title="Edit member"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        {member.id !== currentUserId && member.role !== "OWNER" && member.is_active && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Deactivate "${member.name}"? They will no longer be able to log in.`)) {
+                                onDeleteMember(member.id);
+                              }
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-red-500"
+                            title="Deactivate member"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     )}
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-gray-900">

@@ -193,4 +193,45 @@ router.put("/:id", authenticate, async (req: Request, res: Response): Promise<vo
   res.json({ member: updated });
 });
 
+/**
+ * DELETE /api/team/:id
+ * Owner or Admin can deactivate a team member (soft delete).
+ */
+router.delete("/:id", authenticate, async (req: Request, res: Response): Promise<void> => {
+  const user = req.user!;
+
+  if (user.role !== "OWNER" && user.role !== "ADMIN") {
+    res.status(403).json({ error: "Only owner or admin can remove team members" });
+    return;
+  }
+
+  const memberId = req.params.id as string;
+
+  if (memberId === user.id) {
+    res.status(400).json({ error: "Cannot deactivate yourself" });
+    return;
+  }
+
+  const target = await prisma.user.findFirst({
+    where: { id: memberId, tenantId: user.tenantId },
+  });
+
+  if (!target) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+
+  if (target.role === "OWNER") {
+    res.status(403).json({ error: "Cannot deactivate an owner" });
+    return;
+  }
+
+  await prisma.user.update({
+    where: { id: memberId },
+    data: { is_active: false },
+  });
+
+  res.json({ message: "Member deactivated" });
+});
+
 export default router;

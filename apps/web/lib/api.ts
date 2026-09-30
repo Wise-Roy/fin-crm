@@ -312,6 +312,10 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(data),
       }),
+    delete: (id: string) =>
+      request<{ message: string }>(`/team/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }),
   },
 
 
