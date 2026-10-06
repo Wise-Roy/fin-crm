@@ -180,22 +180,24 @@ export function TasksView({
             <select
               value={filterClient}
               onChange={(e) => setFilterClient(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
+              title={filterClient ? clientOptions.find(([id]) => id === filterClient)?.[1] || "All Clients" : "All Clients"}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none w-32 truncate"
             >
               <option value="">All Clients</option>
               {clientOptions.map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
+                <option key={id} value={id} title={name}>{name}</option>
               ))}
             </select>
             <select
               value={filterAssignee}
               onChange={(e) => setFilterAssignee(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none"
+              title={filterAssignee && filterAssignee !== "__unassigned__" ? teamMembers.find((m) => m.id === filterAssignee)?.name || "All Assignees" : filterAssignee === "__unassigned__" ? "Unassigned" : "All Assignees"}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10 appearance-none w-32 truncate"
             >
               <option value="">All Assignees</option>
               <option value="__unassigned__">Unassigned</option>
               {teamMembers.filter((m) => m.is_active).map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
+                <option key={m.id} value={m.id} title={m.name}>{m.name}</option>
               ))}
             </select>
             <div className="relative">
