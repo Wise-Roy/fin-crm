@@ -189,7 +189,7 @@ router.post(
         effort: effort ? (effort as any) : null,
         status: "TODO",
         due_date: due_date ? new Date(due_date) : null,
-        completed_at: due_date ? new Date(due_date) : null,
+        completed_at: null,
         category_id: category_id || null,
         subcategory_id: subcategory_id || null,
         client_group_id: client_group_id || null,
@@ -328,25 +328,26 @@ router.patch(
   authenticate,
   requirePermission(PERMISSIONS.TASK_ASSIGN),
   async (req: Request, res: Response): Promise<void> => {
-    const { assigned_to_employee_id } = req.body as { assigned_to_employee_id?: string };
-    if (!assigned_to_employee_id) { res.status(400).json({ error: "assigned_to_employee_id is required" }); return; }
+    const { assigned_to_employee_id } = req.body as { assigned_to_employee_id?: string | null };
 
     const existing = await prisma.task.findFirst({ where: { id: req.params.id as string, tenant_id: req.tenant!.id } });
     if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
 
-    // Validate role hierarchy
-    const assignee = await prisma.user.findFirst({ where: { id: assigned_to_employee_id, tenantId: req.tenant!.id } });
-    if (!assignee) { res.status(404).json({ error: "Assignee not found" }); return; }
-    const allowed = ASSIGNABLE_ROLES[req.user!.role] ?? [];
-    if (!allowed.includes(assignee.role)) {
-      res.status(403).json({ error: "You cannot assign tasks to a user with that role" });
-      return;
+    // Validate role hierarchy if assigning (not unassigning)
+    if (assigned_to_employee_id) {
+      const assignee = await prisma.user.findFirst({ where: { id: assigned_to_employee_id, tenantId: req.tenant!.id } });
+      if (!assignee) { res.status(404).json({ error: "Assignee not found" }); return; }
+      const allowed = ASSIGNABLE_ROLES[req.user!.role] ?? [];
+      if (!allowed.includes(assignee.role)) {
+        res.status(403).json({ error: "You cannot assign tasks to a user with that role" });
+        return;
+      }
     }
 
     const [task] = await Promise.all([
       prisma.task.update({
         where: { id: req.params.id as string },
-        data: { assigned_to_employee_id, updated_at: new Date() },
+        data: { assigned_to_employee_id: assigned_to_employee_id || null, updated_at: new Date() },
         include: TASK_INCLUDES,
       }),
       // Log assignment change to task_history
@@ -357,13 +358,13 @@ router.patch(
           changed_by_user_id: req.user!.id,
           action: "assignment_change",
           old_value: { assigned_to: existing.assigned_to_employee_id },
-          new_value: { assigned_to: assigned_to_employee_id },
+          new_value: { assigned_to: assigned_to_employee_id || null },
         },
       }),
     ]);
 
     // Notify new assignee
-    if (assigned_to_employee_id !== req.user!.id) {
+    if (assigned_to_employee_id && assigned_to_employee_id !== req.user!.id) {
       notify({
         tenantId: req.tenant!.id,
         userId: assigned_to_employee_id,

@@ -126,6 +126,10 @@ export interface Client extends ClientKyc {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  constitution?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_mobile?: string | null;
   client_group?: ClientGroup[];
 }
 

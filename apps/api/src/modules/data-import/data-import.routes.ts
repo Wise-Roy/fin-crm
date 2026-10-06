@@ -78,6 +78,10 @@ router.get("/template/clients", authenticate, async (_req: Request, res: Respons
     name: "Acme Corp",
     email: "info@acme.com",
     phone: "9876543210",
+    constitution: "Private Limited",
+    contact_name: "John Doe",
+    contact_email: "john@acme.com",
+    contact_mobile: "9876543200",
     group_name: "Mumbai Branch",
     group_email: "mumbai@acme.com",
     group_phone: "9876543211",
@@ -407,6 +411,10 @@ router.post(
             }
             if (row.email) kycUpdate.email = row.email;
             if (row.phone) kycUpdate.phone = row.phone;
+            if (row.constitution) kycUpdate.constitution = row.constitution;
+            if (row.contact_name) kycUpdate.contact_name = row.contact_name;
+            if (row.contact_email) kycUpdate.contact_email = row.contact_email;
+            if (row.contact_mobile) kycUpdate.contact_mobile = row.contact_mobile;
 
             await tx.client.update({ where: { id: existing.id }, data: kycUpdate as any });
             clientId = existing.id;
@@ -429,6 +437,10 @@ router.post(
                 name: row.name,
                 email: row.email,
                 phone: row.phone,
+                constitution: row.constitution,
+                contact_name: row.contact_name,
+                contact_email: row.contact_email,
+                contact_mobile: row.contact_mobile,
                 ...kycData,
               } as any,
             });

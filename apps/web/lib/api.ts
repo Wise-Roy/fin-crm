@@ -201,7 +201,7 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ status }),
       }),
-    assign: (id: string, assigned_to_employee_id: string) =>
+    assign: (id: string, assigned_to_employee_id: string | null) =>
       request<{ task: Task }>(`/tasks/${encodeURIComponent(id)}/assign`, {
         method: "PATCH",
         body: JSON.stringify({ assigned_to_employee_id }),
@@ -333,6 +333,13 @@ export const api = {
       }),
     deleteLogo: () =>
       request<{ success: boolean }>("/config/logo", { method: "DELETE" }),
+    getOrgSettings: () =>
+      request<{ settings: Record<string, unknown> }>("/config/org-settings"),
+    updateOrgSettings: (settings: Record<string, unknown>) =>
+      request<{ settings: Record<string, unknown> }>("/config/org-settings", {
+        method: "PUT",
+        body: JSON.stringify({ settings }),
+      }),
   },
 
   notifications: {

@@ -167,4 +167,44 @@ router.delete("/logo", authenticate, async (req: Request, res: Response): Promis
   res.json({ success: true });
 });
 
+// ─── Org Settings ────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/config/org-settings
+ * Returns org-level feature settings for the current tenant.
+ */
+router.get("/org-settings", authenticate, async (req: Request, res: Response): Promise<void> => {
+  const tenantId = req.user!.tenantId;
+  const config = await prisma.tenant_config.findUnique({
+    where: { tenant_id_config_key: { tenant_id: tenantId, config_key: "org_settings" } },
+  });
+  res.json({ settings: config?.config_value ?? {} });
+});
+
+/**
+ * PUT /api/config/org-settings
+ * Updates org-level feature settings. OWNER only.
+ */
+router.put("/org-settings", authenticate, async (req: Request, res: Response): Promise<void> => {
+  const user = req.user!;
+  if (user.role !== "OWNER") {
+    res.status(403).json({ error: "Only the owner can update org settings" });
+    return;
+  }
+
+  const { settings } = req.body;
+  if (!settings || typeof settings !== "object") {
+    res.status(400).json({ error: "Invalid settings" });
+    return;
+  }
+
+  const config = await prisma.tenant_config.upsert({
+    where: { tenant_id_config_key: { tenant_id: user.tenantId, config_key: "org_settings" } },
+    create: { tenant_id: user.tenantId, config_key: "org_settings", config_value: settings },
+    update: { config_value: settings, updated_at: new Date() },
+  });
+
+  res.json({ settings: config.config_value });
+});
+
 export default router;

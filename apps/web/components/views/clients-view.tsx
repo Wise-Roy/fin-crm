@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Building2, X, Users, FolderPlus, IndianRupee, Trash2, Edit3, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { Plus, Building2, X, Users, FolderPlus, IndianRupee, Trash2, Edit3, ChevronDown, ChevronUp, Search, Info } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Task, Client, ClientGroup, ClientKyc, TaskPayment, ClientRevenue, Role } from "@/lib/types";
-import { can, fmtDate, fmtINR } from "@/lib/utils";
+import { can, fmtDate, fmtINR, parseEmail } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui-atoms";
 import { api } from "@/lib/api";
 import { ClientKycForm, hasKycErrors } from "@/components/client-kyc-form";
@@ -23,6 +23,7 @@ export function ClientsView({
   onDeleteClient,
   onDeleteGroup,
   userRole,
+  emailParserEnabled,
 }: {
   clients: Client[];
   tasks: Task[];
@@ -34,6 +35,7 @@ export function ClientsView({
   onDeleteClient: (id: string) => void;
   onDeleteGroup: (clientId: string, groupId: string) => void;
   userRole: Role;
+  emailParserEnabled?: boolean;
 }) {
   const [selected, setSelected] = useState<Client | null>(null);
   const [addMode, setAddMode] = useState<AddMode>(null);
@@ -47,13 +49,13 @@ export function ClientsView({
   const [editGroupKycMode, setEditGroupKycMode] = useState<"keep" | "copy" | "custom">("keep");
 
   // Client form
-  const [clientForm, setClientForm] = useState({ name: "", email: "", phone: "" });
+  const [clientForm, setClientForm] = useState({ name: "", email: "", phone: "", constitution: "", contact_name: "", contact_email: "", contact_mobile: "" });
   const [clientKyc, setClientKyc] = useState<ClientKyc>({});
   const [showKycForm, setShowKycForm] = useState(false);
 
   // Edit client state
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" });
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", constitution: "", contact_name: "", contact_email: "", contact_mobile: "" });
   const [editKyc, setEditKyc] = useState<ClientKyc>({});
   const [showEditKyc, setShowEditKyc] = useState(false);
   // Group form
@@ -75,8 +77,15 @@ export function ClientsView({
         c.name.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
         c.phone?.toLowerCase().includes(q) ||
+        c.contact_name?.toLowerCase().includes(q) ||
+        c.contact_email?.toLowerCase().includes(q) ||
+        c.contact_mobile?.toLowerCase().includes(q) ||
         c.business_pan?.toLowerCase().includes(q) ||
-        c.client_group?.some((g) => g.group_name.toLowerCase().includes(q))
+        c.client_group?.some((g) =>
+          g.group_name.toLowerCase().includes(q) ||
+          g.email?.toLowerCase().includes(q) ||
+          g.phone?.toLowerCase().includes(q)
+        )
     );
   }, [clients, search]);
 
@@ -114,16 +123,23 @@ export function ClientsView({
   const clientNameErr = validateName(clientForm.name).error;
   const clientEmailErr = validateEmail(clientForm.email).error;
   const clientPhoneErr = validatePhone(clientForm.phone).error;
+  const contactEmailErr = clientForm.contact_email ? validateEmail(clientForm.contact_email).error : null;
+  const contactMobileErr = clientForm.contact_mobile ? validatePhone(clientForm.contact_mobile).error : null;
 
   const submitClient = () => {
-    if (!clientForm.name || clientNameErr || clientEmailErr || clientPhoneErr) return;
+    if (!clientForm.name || clientNameErr || clientEmailErr || clientPhoneErr || contactEmailErr || contactMobileErr) return;
     if (hasKycErrors(clientKyc)) return;
     const kycData: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(clientKyc)) {
       if (v) kycData[k] = v;
     }
-    onAddClient({ name: clientForm.name, email: clientForm.email || undefined, phone: clientForm.phone || undefined, ...kycData });
-    setClientForm({ name: "", email: "", phone: "" });
+    onAddClient({
+      name: clientForm.name, email: clientForm.email || undefined, phone: clientForm.phone || undefined,
+      constitution: clientForm.constitution || undefined,
+      contact_name: clientForm.contact_name || undefined, contact_email: clientForm.contact_email || undefined, contact_mobile: clientForm.contact_mobile || undefined,
+      ...kycData,
+    });
+    setClientForm({ name: "", email: "", phone: "", constitution: "", contact_name: "", contact_email: "", contact_mobile: "" });
     setClientKyc({});
     setShowKycForm(false);
     setAddMode(null);
@@ -248,7 +264,7 @@ export function ClientsView({
   };
 
   const startEditClient = (c: Client) => {
-    setEditForm({ name: c.name, email: c.email || "", phone: c.phone || "" });
+    setEditForm({ name: c.name, email: c.email || "", phone: c.phone || "", constitution: c.constitution || "", contact_name: c.contact_name || "", contact_email: c.contact_email || "", contact_mobile: c.contact_mobile || "" });
     setEditKyc({
       business_pan: c.business_pan || "",
       address_line1: c.address_line1 || "",
@@ -271,14 +287,20 @@ export function ClientsView({
   const editNameErr = validateName(editForm.name).error;
   const editEmailErr = validateEmail(editForm.email).error;
   const editPhoneErr = validatePhone(editForm.phone).error;
+  const editContactEmailErr = editForm.contact_email ? validateEmail(editForm.contact_email).error : null;
+  const editContactMobileErr = editForm.contact_mobile ? validatePhone(editForm.contact_mobile).error : null;
 
   const saveEditClient = () => {
-    if (!selectedClient || !editForm.name || editNameErr || editEmailErr || editPhoneErr) return;
+    if (!selectedClient || !editForm.name || editNameErr || editEmailErr || editPhoneErr || editContactEmailErr || editContactMobileErr) return;
     if (hasKycErrors(editKyc)) return;
     const data: Record<string, unknown> = {
       name: editForm.name,
       email: editForm.email || null,
       phone: editForm.phone || null,
+      constitution: editForm.constitution || null,
+      contact_name: editForm.contact_name || null,
+      contact_email: editForm.contact_email || null,
+      contact_mobile: editForm.contact_mobile || null,
     };
     for (const [k, v] of Object.entries(editKyc)) {
       data[k] = v || null;
@@ -334,12 +356,36 @@ export function ClientsView({
                     {clientNameErr && <p className="text-xs text-red-500 mt-0.5">{clientNameErr}</p>}
                   </div>
                   <div>
-                    <input placeholder="Email" value={clientForm.email} onChange={(e) => setClientForm((p) => ({ ...p, email: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                    <input placeholder="Email" value={clientForm.email} onChange={(e) => setClientForm((p) => ({ ...p, email: emailParserEnabled ? parseEmail(e.target.value) : e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
                     {clientEmailErr && <p className="text-xs text-red-500 mt-0.5">{clientEmailErr}</p>}
                   </div>
                   <div>
                     <input placeholder="Phone" value={clientForm.phone} onChange={(e) => setClientForm((p) => ({ ...p, phone: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
                     {clientPhoneErr && <p className="text-xs text-red-500 mt-0.5">{clientPhoneErr}</p>}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-xs text-gray-500">Constitution</span>
+                    <span className="group relative">
+                      <Info size={11} className="text-gray-400 cursor-help" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-48 text-xs bg-gray-900 text-white rounded-lg px-2.5 py-1.5 shadow-lg z-10">This may be Private Limited Company, Individual, LLP, Proprietor, Trust, etc.</span>
+                    </span>
+                  </div>
+                  <input placeholder="e.g. Private Limited" value={clientForm.constitution} onChange={(e) => setClientForm((p) => ({ ...p, constitution: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1">Primary Contact</p>
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div>
+                    <input placeholder="Contact Name" value={clientForm.contact_name} onChange={(e) => setClientForm((p) => ({ ...p, contact_name: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                  </div>
+                  <div>
+                    <input placeholder="Contact Email" value={clientForm.contact_email} onChange={(e) => setClientForm((p) => ({ ...p, contact_email: emailParserEnabled ? parseEmail(e.target.value) : e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                    {contactEmailErr && <p className="text-xs text-red-500 mt-0.5">{contactEmailErr}</p>}
+                  </div>
+                  <div>
+                    <input placeholder="Contact Mobile" value={clientForm.contact_mobile} onChange={(e) => setClientForm((p) => ({ ...p, contact_mobile: e.target.value }))} className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-900/10 bg-white" />
+                    {contactMobileErr && <p className="text-xs text-red-500 mt-0.5">{contactMobileErr}</p>}
                   </div>
                 </div>
                 <button
@@ -355,7 +401,7 @@ export function ClientsView({
                 )}
                 <div className="flex gap-2">
                   <button onClick={() => { setAddMode(null); setShowKycForm(false); }} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
-                  <button onClick={submitClient} disabled={!clientForm.name || !!clientNameErr || !!clientEmailErr || !!clientPhoneErr || hasKycErrors(clientKyc)} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">Add Client</button>
+                  <button onClick={submitClient} disabled={!clientForm.name || !!clientNameErr || !!clientEmailErr || !!clientPhoneErr || !!contactEmailErr || !!contactMobileErr || hasKycErrors(clientKyc)} className="text-sm font-medium bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">Add Client</button>
                 </div>
               </div>
             </motion.div>
@@ -516,7 +562,7 @@ export function ClientsView({
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-0.5">Email</label>
-                      <input value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                      <input value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: emailParserEnabled ? parseEmail(e.target.value) : e.target.value }))}
                         className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
                       {editEmailErr && <p className="text-xs text-red-500 mt-0.5">{editEmailErr}</p>}
                     </div>
@@ -525,6 +571,37 @@ export function ClientsView({
                       <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
                         className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
                       {editPhoneErr && <p className="text-xs text-red-500 mt-0.5">{editPhoneErr}</p>}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <label className="text-xs text-gray-500">Constitution</label>
+                      <span className="group relative">
+                        <Info size={11} className="text-gray-400 cursor-help" />
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-48 text-xs bg-gray-900 text-white rounded-lg px-2.5 py-1.5 shadow-lg z-10">This may be Private Limited Company, Individual, LLP, Proprietor, Trust, etc.</span>
+                      </span>
+                    </div>
+                    <input value={editForm.constitution} onChange={(e) => setEditForm((p) => ({ ...p, constitution: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" placeholder="e.g. Private Limited" />
+                  </div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1">Primary Contact</p>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Contact Name</label>
+                      <input value={editForm.contact_name} onChange={(e) => setEditForm((p) => ({ ...p, contact_name: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Contact Email</label>
+                      <input value={editForm.contact_email} onChange={(e) => setEditForm((p) => ({ ...p, contact_email: emailParserEnabled ? parseEmail(e.target.value) : e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {editContactEmailErr && <p className="text-xs text-red-500 mt-0.5">{editContactEmailErr}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Contact Mobile</label>
+                      <input value={editForm.contact_mobile} onChange={(e) => setEditForm((p) => ({ ...p, contact_mobile: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                      {editContactMobileErr && <p className="text-xs text-red-500 mt-0.5">{editContactMobileErr}</p>}
                     </div>
                   </div>
                   <button
@@ -540,7 +617,7 @@ export function ClientsView({
                   )}
                   <div className="flex gap-2 pt-2">
                     <button onClick={() => setEditMode(false)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
-                    <button onClick={saveEditClient} disabled={!editForm.name || !!editNameErr || !!editEmailErr || !!editPhoneErr || hasKycErrors(editKyc)}
+                    <button onClick={saveEditClient} disabled={!editForm.name || !!editNameErr || !!editEmailErr || !!editPhoneErr || !!editContactEmailErr || !!editContactMobileErr || hasKycErrors(editKyc)}
                       className="text-sm font-medium bg-gray-900 text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50">
                       Save Changes
                     </button>
@@ -553,6 +630,7 @@ export function ClientsView({
                 {(([
                   ["Email", selectedClient.email || "\u2014"],
                   ["Phone", selectedClient.phone || "\u2014"],
+                  ["Constitution", selectedClient.constitution || "\u2014"],
                   ["Status", selectedClient.is_active ? "Active" : "Inactive"],
                   ["Since", fmtDate(selectedClient.created_at)],
                 ] as const)).map(([l, v]) => (
@@ -562,6 +640,27 @@ export function ClientsView({
                   </div>
                 ))}
               </div>
+
+              {/* Primary Contact */}
+              {(selectedClient.contact_name || selectedClient.contact_email || selectedClient.contact_mobile) && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Primary Contact</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Name</div>
+                      <div className="text-xs font-medium text-gray-800 truncate">{selectedClient.contact_name || "\u2014"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Email</div>
+                      <div className="text-xs font-medium text-gray-800 truncate">{selectedClient.contact_email || "\u2014"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Mobile</div>
+                      <div className="text-xs font-medium text-gray-800 truncate">{selectedClient.contact_mobile || "\u2014"}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* KYC Details */}
               {(selectedClient.business_pan || selectedClient.gst_number || selectedClient.din || selectedClient.cin || selectedClient.llpin) && (
@@ -799,12 +898,32 @@ export function ClientsView({
                   {clientTasks.length === 0 ? (
                     <p className="text-xs text-gray-400">No tasks linked yet.</p>
                   ) : (
-                    clientTasks.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 gap-2">
-                        <span className="text-xs text-gray-700 font-medium truncate flex-1">{t.title}</span>
-                        <StatusBadge status={t.status} />
-                      </div>
-                    ))
+                    clientTasks.map((t) => {
+                      const assignee = t.users_task_assigned_to_employee_idTousers;
+                      let duration = "";
+                      if (t.status === "COMPLETED" && t.completed_at) {
+                        const ms = new Date(t.completed_at).getTime() - new Date(t.created_at).getTime();
+                        const days = Math.floor(ms / 86400000);
+                        const hrs = Math.floor((ms % 86400000) / 3600000);
+                        if (days > 0) duration = `${days}d ${hrs}h`;
+                        else if (hrs > 0) duration = `${hrs}h`;
+                        else duration = "<1h";
+                      }
+                      return (
+                        <div key={t.id} className="bg-gray-50 rounded-lg px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-gray-700 font-medium truncate flex-1">{t.title}</span>
+                            <StatusBadge status={t.status} />
+                          </div>
+                          {t.status === "COMPLETED" && (
+                            <div className="flex items-center justify-between mt-1.5 text-xs text-gray-400">
+                              {duration && <span className="font-medium text-gray-600">{duration}</span>}
+                              {assignee && <span className="font-medium text-gray-600">{assignee.name.split(" ")[0]}</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>

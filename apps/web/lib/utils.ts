@@ -204,6 +204,34 @@ export const DSC_STATUS_CFG: Record<DscStatus, { label: string; cls: string }> =
   EXPIRED: { label: "Expired", cls: "bg-red-50 text-red-600" },
 };
 
+/** Readable label for any status/enum value. Uses STATUS_CFG if available, else sentence-cases. */
+export const statusLabel = (val: string | null | undefined): string => {
+  if (!val) return "Unknown";
+  const cfg = STATUS_CFG[val as TaskStatus];
+  if (cfg) return cfg.label;
+  return val.charAt(0).toUpperCase() + val.slice(1).toLowerCase().replace(/_/g, " ");
+};
+
+/** Format time only: "11:24 PM" */
+export const fmtTime = (s: string) =>
+  new Date(s).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+
+/** Group date label: "Today", "Yesterday", or "06 Oct 2026" */
+export const dayLabel = (s: string): string => {
+  const d = new Date(s);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = today.getTime() - target.getTime();
+  if (diff === 0) return "Today";
+  if (diff === 86400000) return "Yesterday";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+/** Parse obfuscated email: [DOT] → . , [AT] → @ (case-insensitive) */
+export const parseEmail = (raw: string): string =>
+  raw.replace(/\[DOT\]/gi, ".").replace(/\[AT\]/gi, "@").trim().toLowerCase();
+
 export const PAYMENT_CLS: Record<PaymentStatus, string> = {
   PENDING: "bg-amber-50 text-amber-700",
   SUCCESS: "bg-emerald-50 text-emerald-700",

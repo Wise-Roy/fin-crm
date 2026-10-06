@@ -67,12 +67,20 @@ export function DashboardView({
 
   return (
     <div className="space-y-6">
-      {/* Greeting */}
+      {/* Date + Greeting */}
       <div>
+        <motion.p
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xs font-medium text-gray-400 uppercase tracking-wider"
+        >
+          {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+        </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-semibold text-gray-900"
+          transition={{ delay: 0.05 }}
+          className="text-2xl font-semibold text-gray-900 mt-1"
         >
           {getGreeting()}, {firstName}
         </motion.h1>

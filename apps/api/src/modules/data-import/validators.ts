@@ -159,6 +159,10 @@ export const CLIENT_COLUMNS = [
   "name",
   "email",
   "phone",
+  "constitution",
+  "contact_name",
+  "contact_email",
+  "contact_mobile",
   "group_name",
   "group_email",
   "group_phone",
@@ -181,6 +185,10 @@ export interface ClientRow {
   name: string;
   email: string | null;
   phone: string | null;
+  constitution: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_mobile: string | null;
   group_name: string | null;
   group_email: string | null;
   group_phone: string | null;
@@ -253,22 +261,27 @@ export function validateClientSheet(sheet: Worksheet, maxRows = 1000): Validatio
       errors.push({ row: r, column: "email", message: `Invalid email "${email}"` });
     }
 
-    const groupEmail = cellStr(5);
+    const contactEmail = cellStr(6);
+    if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      errors.push({ row: r, column: "contact_email", message: `Invalid email "${contactEmail}"` });
+    }
+
+    const groupEmail = cellStr(9);
     if (groupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(groupEmail)) {
       errors.push({ row: r, column: "group_email", message: `Invalid email "${groupEmail}"` });
     }
 
-    const groupName = cellStr(4);
+    const groupName = cellStr(8);
     if (!name && groupName) {
       errors.push({ row: r, column: "group_name", message: "group_name requires a client name" });
     }
 
-    const pan = cellStr(7);
+    const pan = cellStr(11);
     if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan.toUpperCase())) {
       errors.push({ row: r, column: "business_pan", message: `Invalid PAN format "${pan}"` });
     }
 
-    const gst = cellStr(17);
+    const gst = cellStr(21);
     if (gst && !/^\d{2}[A-Z]{5}\d{4}[A-Z]\d[Z][A-Z\d]$/.test(gst.toUpperCase())) {
       errors.push({ row: r, column: "gst_number", message: `Invalid GST format "${gst}"` });
     }
@@ -277,22 +290,26 @@ export function validateClientSheet(sheet: Worksheet, maxRows = 1000): Validatio
       name: name || "",
       email,
       phone: cellStr(3),
+      constitution: cellStr(4),
+      contact_name: cellStr(5),
+      contact_email: contactEmail,
+      contact_mobile: cellStr(7),
       group_name: groupName,
       group_email: groupEmail,
-      group_phone: cellStr(6),
+      group_phone: cellStr(10),
       business_pan: pan?.toUpperCase() || null,
-      address_line1: cellStr(8),
-      address_line2: cellStr(9),
-      city: cellStr(10),
-      state: cellStr(11),
-      country: cellStr(12),
-      pincode: cellStr(13),
-      llpin: cellStr(14),
-      din: cellStr(15),
-      cin: cellStr(16),
+      address_line1: cellStr(12),
+      address_line2: cellStr(13),
+      city: cellStr(14),
+      state: cellStr(15),
+      country: cellStr(16),
+      pincode: cellStr(17),
+      llpin: cellStr(18),
+      din: cellStr(19),
+      cin: cellStr(20),
       gst_number: gst?.toUpperCase() || null,
-      gst_state_code: cellStr(18),
-      gst_dest_address: cellStr(19),
+      gst_state_code: cellStr(22),
+      gst_dest_address: cellStr(23),
     });
   }
 

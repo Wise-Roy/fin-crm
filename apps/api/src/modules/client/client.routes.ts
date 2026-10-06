@@ -80,13 +80,21 @@ router.post(
   authenticate,
   requirePermission(PERMISSIONS.CLIENT_CREATE),
   async (req: Request, res: Response): Promise<void> => {
-    const { name, email, phone } = req.body as Record<string, string | undefined>;
+    const { name, email, phone, constitution, contact_name, contact_email, contact_mobile } = req.body as Record<string, string | undefined>;
     if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
     const emailErr = validateEmail(email);
     if (emailErr) { res.status(400).json({ error: emailErr }); return; }
     const phoneErr = validatePhone(phone);
     if (phoneErr) { res.status(400).json({ error: phoneErr }); return; }
+    if (contact_email) {
+      const ce = validateEmail(contact_email);
+      if (ce) { res.status(400).json({ error: `Primary contact: ${ce}` }); return; }
+    }
+    if (contact_mobile) {
+      const cm = validatePhone(contact_mobile);
+      if (cm) { res.status(400).json({ error: `Primary contact: ${cm}` }); return; }
+    }
 
     const kycData: Record<string, unknown> = {};
     const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
@@ -103,6 +111,10 @@ router.post(
         name,
         email: email || null,
         phone: phone || null,
+        constitution: constitution || null,
+        contact_name: contact_name || null,
+        contact_email: contact_email || null,
+        contact_mobile: contact_mobile || null,
         ...kycData,
       } as any,
       include: { client_group: true },
@@ -229,12 +241,18 @@ router.put(
 
     if (body.email !== undefined) { const e = validateEmail(body.email as string); if (e) { res.status(400).json({ error: e }); return; } }
     if (body.phone !== undefined) { const e = validatePhone(body.phone as string); if (e) { res.status(400).json({ error: e }); return; } }
+    if (body.contact_email !== undefined && body.contact_email) { const e = validateEmail(body.contact_email as string); if (e) { res.status(400).json({ error: `Primary contact: ${e}` }); return; } }
+    if (body.contact_mobile !== undefined && body.contact_mobile) { const e = validatePhone(body.contact_mobile as string); if (e) { res.status(400).json({ error: `Primary contact: ${e}` }); return; } }
 
     const kycKeys = ["business_pan", "address_line1", "address_line2", "city", "state", "country", "pincode", "llpin", "din", "cin", "gst_number", "gst_state_code", "gst_dest_address"] as const;
     const data: Record<string, unknown> = { updated_at: new Date() };
     if (body.name !== undefined) data.name = body.name;
     if (body.email !== undefined) data.email = body.email;
     if (body.phone !== undefined) data.phone = body.phone;
+    if (body.constitution !== undefined) data.constitution = body.constitution || null;
+    if (body.contact_name !== undefined) data.contact_name = body.contact_name || null;
+    if (body.contact_email !== undefined) data.contact_email = body.contact_email || null;
+    if (body.contact_mobile !== undefined) data.contact_mobile = body.contact_mobile || null;
     if (body.is_active !== undefined) data.is_active = body.is_active;
     for (const k of kycKeys) {
       if (body[k] !== undefined) data[k] = body[k] || null;

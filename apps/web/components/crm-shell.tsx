@@ -99,6 +99,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
   const [notifs, setNotifs] = useState<NotifType[]>([]);
 
   const [dateRange, setDateRange] = useState<DateRange>(getLast30DaysRange);
+  const [orgSettings, setOrgSettings] = useState<Record<string, unknown>>({});
 
   const [taskFilter, setTaskFilter] = useState<TaskFilterMode | undefined>(undefined);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -156,6 +157,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
         api.dsc.list({ limit: "100" }),
         api.payments.list({ limit: "100" }),
         api.notifications.list({ limit: "30" }),
+        api.config.getOrgSettings(),
       ];
       const results = await Promise.all(fetches);
       setTasks((results[0] as { data: Task[] }).data);
@@ -166,6 +168,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
       setDscEntries((results[5] as { data: Dsc[] }).data);
       setPayments((results[6] as { data: TaskPayment[] }).data);
       setNotifs((results[7] as { data: NotifType[] }).data);
+      setOrgSettings((results[8] as { settings: Record<string, unknown> }).settings);
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
@@ -226,7 +229,7 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
     } catch (err) { console.error("Failed to delete task:", err); }
   }, []);
 
-  const handleAssignTask = useCallback(async (id: string, assigneeId: string) => {
+  const handleAssignTask = useCallback(async (id: string, assigneeId: string | null) => {
     try {
       const { task } = await api.tasks.assign(id, assigneeId);
       setTasks((prev) => prev.map((t) => (t.id === id ? task : t)));
@@ -749,7 +752,8 @@ export function CRMShell({ onLogout }: { onLogout: () => void }) {
                 <ClientsView clients={clients} tasks={tasks} payments={payments}
                   onAddClient={handleAddClient} onUpdateClient={handleUpdateClient}
                   onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup}
-                  onDeleteClient={handleDeleteClient} onDeleteGroup={handleDeleteGroup} userRole={userRole} />
+                  onDeleteClient={handleDeleteClient} onDeleteGroup={handleDeleteGroup} userRole={userRole}
+                  emailParserEnabled={!!orgSettings.email_parser_enabled} />
               )}
               {view === "team" && (
                 <TeamView teamMembers={teamMembers} tasks={tasks}

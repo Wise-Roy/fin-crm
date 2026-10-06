@@ -85,6 +85,28 @@ export function ConfigurationView() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Org settings
+  const [emailParserEnabled, setEmailParserEnabled] = useState(false);
+  const [orgSettingsLoaded, setOrgSettingsLoaded] = useState(false);
+
+  // Load org settings on mount
+  useState(() => {
+    api.config.getOrgSettings().then(({ settings }) => {
+      setEmailParserEnabled(!!settings.email_parser_enabled);
+      setOrgSettingsLoaded(true);
+    }).catch(() => setOrgSettingsLoaded(true));
+  });
+
+  const toggleEmailParser = async () => {
+    const next = !emailParserEnabled;
+    setEmailParserEnabled(next);
+    try {
+      await api.config.updateOrgSettings({ email_parser_enabled: next });
+    } catch {
+      setEmailParserEnabled(!next); // revert
+    }
+  };
+
   const updateColor = (key: keyof ThemeConfig["colors"], val: string) => {
     const next = { ...draft, colors: { ...draft.colors, [key]: val } };
     setDraft(next);
@@ -341,6 +363,30 @@ export function ConfigurationView() {
             icon={Palette}
             description="Buttons and primary actions"
           />
+        </div>
+      </section>
+
+      {/* Org Settings */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+          Organisation Settings
+        </h3>
+        <div className="p-4 bg-white rounded-xl border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-900">Email Parser</div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Auto-convert pasted emails like NOONE[DOT]45[AT]GMAIL[DOT]COM to noone.45@gmail.com
+              </p>
+            </div>
+            <button
+              onClick={toggleEmailParser}
+              disabled={!orgSettingsLoaded}
+              className={`relative w-10 h-5 rounded-full transition-colors ${emailParserEnabled ? "bg-gray-900" : "bg-gray-300"} disabled:opacity-50`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${emailParserEnabled ? "left-5" : "left-0.5"}`} />
+            </button>
+          </div>
         </div>
       </section>
 

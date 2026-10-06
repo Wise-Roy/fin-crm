@@ -73,6 +73,11 @@ model client {
   gst_number           String?        @db.VarChar(15)
   gst_state_code       String?        @db.VarChar(2)
   gst_dest_address     String?        @db.VarChar(500)
+  // Primary contact
+  constitution         String?        @db.VarChar(100)
+  contact_name         String?        @db.VarChar(255)
+  contact_email        String?        @db.VarChar(255)
+  contact_mobile       String?        @db.VarChar(20)
   tenant               tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   client_group         client_group[]
   task                 task[]
